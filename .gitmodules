@@ -4,3 +4,6 @@
 [submodule "vendor/catch2"]
 	path = vendor/catch2
 	url = https://github.com/catchorg/Catch2
+[submodule "vendor/Arriba"]
+	path = vendor/Arriba
+	url = https://github.com/CompSciOrBust/Arriba
