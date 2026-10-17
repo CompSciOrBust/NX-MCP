@@ -1,0 +1,96 @@
+# NX-MCP Agent Guide
+
+## C++ Style
+
+This project follows [Google's C++ Style Guide](https://google.github.io/styleguide/cppguide.html). Key conventions:
+
+- Types (classes, structs, enums): `PascalCase`
+- Functions and methods: `PascalCase`
+- Local variables and parameters: `snake_case`
+- Non-static member variables: `snake_case_` (trailing underscore)
+- Constants (`constexpr`, `const`, enumerators): `kCamelCase`
+- Namespaces: `lowercase`
+- Indentation: 2 spaces
+
+## Project Structure
+
+### `server/`
+
+Contains the MCP (Model Context Protocol) server, which runs as a Nintendo Switch sysmodule. The architecture is split into three layers:
+
+- **HTTP layer** (`server/http/`) — custom synchronous BSD-socket TCP server (`socket_server.cpp`). `App` owns the `SocketServer` and registers the `/mcp` route. This is the only layer that knows about HTTP.
+- **Controllers** (`server/controllers/`) — one class per route group. Each controller parses the HTTP request, delegates to a service, and writes the HTTP response. No business logic lives here.
+- **Services** (`server/services/`) — business logic. Services have no knowledge of HTTP; they receive plain data and return plain data.
+- **Tools** (`server/tools/`) — MCP tools. Each tool inherits from `tools::Tool` and self-registers into `ToolRegistry` via a static initializer in its `.cpp`. The service calls tools polymorphically through the registry with no direct knowledge of individual tools.
+
+JSON serialization uses `nlohmann/json` (`vendor/json`).
+
+Protocol version strings live in `server/mcp_versions.hpp` (`mcp::kVersion = "2026-07-28"`, `mcp::kLegacyVersion = "2025-11-25"`). Do not hardcode version strings elsewhere.
+
+The entrypoint (`server/main.cpp`) uses the standard libnx sysmodule pattern: `__appInit` initializes services (`smInitialize`, `setsysInitialize` to set the host version, `socketInitialize`), then the main loop runs `App::Run()`. `__appExit` tears down `socketExit` and `smExit`. sm is kept open for the module lifetime so tools can call service init functions at runtime.
+
+Build with `make` from the `server/` directory. The output is `server/exefs.nsp`. The server listens on port **57331**.
+
+#### MCP Protocol
+
+The server is **dual-era**, supporting both:
+
+- **Modern** (`2026-07-28`) — stateless, per-request `_meta`
+- **Legacy** (`2025-11-25`) — session-based `initialize` handshake (used by Claude Code)
+
+**Era detection** in `McpController::HandlePost`: if `params._meta` contains `io.modelcontextprotocol/protocolVersion`, the request is routed to `HandleModernRequest`; otherwise to `HandleLegacyRequest`. Requests with no `id` are notifications and receive HTTP 204 with no body.
+
+- **Modern path**: validates `_meta.protocolVersion == mcp::kVersion` and presence of `clientCapabilities`. Wrong version returns JSON-RPC error `-32022` (`UnsupportedProtocolVersionError`).
+- **Legacy path**: no `_meta` required. `initialize` validates `params.protocolVersion == mcp::kLegacyVersion`.
+
+All HTTP responses use status **200**, including JSON-RPC errors. The only exceptions are 204 (notifications) and 405 (GET on `/mcp`).
+
+The MCP endpoint is `POST /mcp`; `GET /mcp` returns 405.
+
+#### Tools
+
+Tools inherit from `tools::Tool` and return `tools::ToolResult`:
+
+```cpp
+struct ToolResult {
+  std::string text;
+  bool is_error = false;
+  std::string image_data;  // non-empty → return image content instead of text
+  std::string image_mime;
+};
+```
+
+Set `is_error = true` for tool-level errors (bad arguments, resource not found, etc.). `McpService` propagates this as `isError` in the MCP result content block. If `image_data` is non-empty, `McpService` emits an `image` content block (`data` + `mimeType`) instead of a `text` block. Unhandled exceptions thrown by `Execute` are caught by `McpService` and returned as `is_error = true` results — they do not crash the server.
+
+#### Adding a Tool
+
+1. Create `server/tools/my_tool.hpp` — subclass `tools::Tool`, declare `Name`, `Description`, `InputSchema`, `Execute`.
+2. Create `server/tools/my_tool.cpp` — implement the methods and add:
+   ```cpp
+   static bool kRegistered =
+       tools::ToolRegistry::Instance().Register(std::make_unique<MyTool>());
+   ```
+
+The Makefile auto-discovers all `.cpp` files in `server/tools/` — no Makefile change needed. Multiple tool classes can share one `.cpp` (e.g. `hid_input_tools.cpp` contains four classes that share internal helpers).
+
+### `server/tests/`
+
+Tests use **Catch2 v2** (`vendor/catch2/catch.hpp`). Run with `make run` from `server/tests/`.
+
+Each test file includes only the translation units it needs — tool auto-registrations are excluded so the registry starts empty. `ToolRegistry::Clear()` is called in a fixture to reset state between test cases.
+
+#### Adding Tests
+
+- **Tool tests**: compile the tool's `.cpp` alongside `tools/tool_registry.cpp` and the test file. Add a `build/<tool_name>.o` rule pointing at `../tools/<tool_name>.cpp`.
+- **Service tests**: compile the relevant service `.cpp` and any dependencies (e.g. `tool_registry.cpp`).
+
+### `launcher/`
+
+Stub — not yet implemented.
+
+### `vendor/`
+
+Git submodules / vendored headers for third-party dependencies:
+
+- `vendor/json` — single-header JSON library (`single_include/nlohmann/json.hpp`)
+- `vendor/catch2` — git submodule, Catch2 v2.13.10 (`single_include/catch2/catch.hpp`)

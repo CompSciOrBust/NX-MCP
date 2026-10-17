@@ -66,3 +66,16 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# macOS metadata
+.DS_Store
+
+# Nintendo Switch / devkitPro build outputs
+*.nsp
+*.nso
+*.npdm
+*.elf
+*.map
+
+# test binaries (no extension)
+server/tests/run_tests
