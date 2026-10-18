@@ -72,6 +72,12 @@ inline constexpr const char* kInstructions =
     "debugging of NRO files over the network.\n"
     "\n"
     "Server health: if you suspect the server has crashed, verify with "
-    "curl http://<ip>:57331/ping — a live server returns \"pong\".\n";
+    "curl http://<ip>:57331/ping — a live server returns \"pong\".\n"
+    "\n"
+    "Large file transfer — use these HTTP endpoints directly with curl instead of the\n"
+    "fs_ tools when you don't want to load file contents into context:\n"
+    "  Download: curl -s -o <local_path> \"http://<ip>:57331/fs/download?path=<sdmc_path>\"\n"
+    "  Upload:   curl -s -X PUT \"http://<ip>:57331/fs/upload?path=<sdmc_path>\" --data-binary @<local_file>\n"
+    "Files are streamed in 64 KB chunks so arbitrarily large files are supported.\n";
 
 }  // namespace mcp

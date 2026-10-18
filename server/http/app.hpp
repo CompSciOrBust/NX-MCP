@@ -6,6 +6,7 @@
 #include "controller.hpp"
 #include "mcp_controller.hpp"
 #include "ping_controller.hpp"
+#include "file_transfer_controller.hpp"
 
 namespace http {
 
@@ -16,8 +17,9 @@ class App {
 
  private:
   std::unique_ptr<IServer> server_;
-  controllers::McpController mcp_controller_;
-  controllers::PingController ping_controller_;
+  controllers::McpController          mcp_controller_;
+  controllers::PingController         ping_controller_;
+  controllers::FileTransferController file_transfer_controller_;
   std::vector<controllers::IController*> controllers_;
 };
 

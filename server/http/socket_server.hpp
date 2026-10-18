@@ -12,8 +12,7 @@ class SocketServer : public IServer {
   Handler handler_;
 
   static bool RecvLine(int fd, std::string& out);
-  static bool RecvExact(int fd, std::string& out, size_t n);
-  static bool ParseRequest(int fd, Request& req);
+  static bool ParseHeaders(int fd, Request& req);
   static void SendResponse(int fd, const Response& resp);
   void HandleConnection(int fd);
 };

@@ -37,18 +37,7 @@ bool SocketServer::RecvLine(int fd, std::string& out) {
   return false;
 }
 
-bool SocketServer::RecvExact(int fd, std::string& out, size_t n) {
-  out.resize(n);
-  size_t total = 0;
-  while (total < n) {
-    int got = ::recv(fd, out.data() + total, n - total, 0);
-    if (got <= 0) return false;
-    total += static_cast<size_t>(got);
-  }
-  return true;
-}
-
-bool SocketServer::ParseRequest(int fd, Request& req) {
+bool SocketServer::ParseHeaders(int fd, Request& req) {
   std::string line;
   if (!RecvLine(fd, line) || line.empty()) return false;
 
@@ -75,13 +64,6 @@ bool SocketServer::ParseRequest(int fd, Request& req) {
     req.headers[ToLower(Trim(line.substr(0, colon)))] = Trim(line.substr(colon + 1));
   }
 
-  auto it = req.headers.find("content-length");
-  if (it != req.headers.end()) {
-    size_t len = std::stoul(it->second);
-    if (len > 0 && len <= 1024 * 1024) {
-      if (!RecvExact(fd, req.body, len)) return false;
-    }
-  }
   return true;
 }
 
@@ -126,10 +108,12 @@ void SocketServer::SetHandler(Handler handler) {
 
 void SocketServer::HandleConnection(int fd) {
   Request req;
-  if (!ParseRequest(fd, req)) { ::close(fd); return; }
+  if (!ParseHeaders(fd, req)) { ::close(fd); return; }
+  req.fd = fd;
 
   Response resp = handler_ ? handler_(req) : Response::NotFound();
-  SendResponse(fd, resp);
+  if (resp.status != 0)
+    SendResponse(fd, resp);
   ::close(fd);
 }
 
