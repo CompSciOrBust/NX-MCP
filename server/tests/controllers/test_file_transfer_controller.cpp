@@ -24,6 +24,16 @@ struct Fixture {
   controllers::FileTransferController ctrl_;
 };
 
+// ── IController interface ────────────────────────────────────────────────────
+
+TEST_CASE_METHOD(Fixture, "Path returns /fs/") {
+  REQUIRE(ctrl_.Path() == "/fs/");
+}
+
+TEST_CASE_METHOD(Fixture, "StreamsBody returns true") {
+  REQUIRE(ctrl_.StreamsBody() == true);
+}
+
 // ── routing / method validation ──────────────────────────────────────────────
 
 TEST_CASE_METHOD(Fixture, "Download: wrong method returns 405") {

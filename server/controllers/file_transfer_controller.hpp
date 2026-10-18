@@ -1,13 +1,16 @@
 #pragma once
+#include "controller.hpp"
 #include "types.hpp"
 #include "file_transfer_service.hpp"
 #include <string>
 
 namespace controllers {
 
-class FileTransferController {
+class FileTransferController : public IController {
  public:
-  http::Response Handle(const http::Request& req);
+  std::string Path() const override { return "/fs/"; }
+  bool StreamsBody() const override { return true; }
+  http::Response Handle(const http::Request& req) override;
 
  private:
   services::FileTransferService service_;

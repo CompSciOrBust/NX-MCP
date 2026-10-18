@@ -9,6 +9,7 @@ class IController {
   virtual ~IController() = default;
   virtual std::string Path() const = 0;
   virtual http::Response Handle(const http::Request& req) = 0;
+  virtual bool StreamsBody() const { return false; }
 };
 
 }  // namespace controllers

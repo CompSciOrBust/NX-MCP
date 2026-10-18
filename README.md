@@ -6,6 +6,8 @@ The primary use case is **game and software development**: deploy builds to the 
 
 With the context NX-MCP provides, AI agents can autonomously pull crash reports, analyse the stack trace and register state, cross-reference your source and map file, and suggest a fix.
 
+**Quick links:** [Installation](#installation) · [Connecting an MCP client](#connecting-an-mcp-client) · [Available Tools](#available-tools) · [File Transfer](#file-transfer) · [Building from Source](#building-from-source) · [Adding a Tool](#adding-a-tool)
+
 ## Installation
 
 1. Download `launcher.nro` from the [latest release](https://github.com/CompSciOrBust/NX-MCP/releases/latest).
