@@ -43,4 +43,32 @@ inline constexpr VersionStr kVersionStr{
 
 inline constexpr const char* kServerVersion = detail::kVersionStr.buf;
 
+inline constexpr const char* kInstructions =
+    "You are connected to a Nintendo Switch running Horizon OS via the NX-MCP sysmodule "
+    "(title ID 0x0100000000057331), loaded by Atmosphère custom firmware.\n"
+    "\n"
+    "Filesystem — use the sdmc:/ prefix for all FS tool paths:\n"
+    "  sdmc:/                            SD card root\n"
+    "  sdmc:/atmosphere/crash_reports/   crash logs (.log text report + .bin minidump)\n"
+    "  sdmc:/atmosphere/contents/        per-title LayeredFS patches and sysmodule NSPs\n"
+    "  sdmc:/atmosphere/config/          Atmosphère config (system_settings.ini, etc.)\n"
+    "  sdmc:/switch/                     homebrew NRO applications\n"
+    "\n"
+    "Auto-start: Atmosphère launches a sysmodule at boot when the file\n"
+    "  sdmc:/atmosphere/contents/<title_id>/flags/boot2.flag exists (title IDs in paths\n"
+    "  have no 0x prefix). NX-MCP boot2.flag path:\n"
+    "  sdmc:/atmosphere/contents/0100000000057331/flags/boot2.flag\n"
+    "\n"
+    "Process model: Horizon has three memory pools — Application (foreground game),\n"
+    "Applet (album/overlays), and System (sysmodules/services). pm_list_processes reports\n"
+    "usage of all three. The foreground game is tagged [app].\n"
+    "\n"
+    "Program IDs are 64-bit hex values. Nintendo system titles occupy\n"
+    "0x0100000000000000–0x01FFFFFFFFFFFFFF.\n"
+    "\n"
+    "Homebrew: to boot into hbmenu, press A to launch a game then immediately press and hold R throughout the entire launch sequence. "
+    "Always use hid_sequence for this — separate tool calls will cause the game to launch in the gap between them while awaiting permission. "
+    "Pressing Y in hbmenu launches nxlink, which enables remote deployment and "
+    "debugging of NRO files over the network.\n";
+
 }  // namespace mcp

@@ -44,7 +44,8 @@ nlohmann::json McpService::HandleInitialize(const nlohmann::json& params,
     {"result", {
       {"protocolVersion", mcp::kLegacyVersion},
       {"capabilities", {{"tools", nlohmann::json::object()}}},
-      {"serverInfo", {{"name", mcp::kServerName}, {"version", mcp::kServerVersion}}}
+      {"serverInfo", {{"name", mcp::kServerName}, {"version", mcp::kServerVersion}}},
+      {"instructions", mcp::kInstructions}
     }}
   };
 }
