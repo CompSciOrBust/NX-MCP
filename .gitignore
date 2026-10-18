@@ -80,4 +80,8 @@ launcher/romfs/
 *.map
 
 # test binaries (no extension)
-server/tests/run_tests
+server/tests/run_tool_registry_tests
+server/tests/run_file_transfer_tests
+server/tests/run_ping_tests
+server/tests/run_mcp_controller_tests
+server/tests/run_mcp_service_tests
