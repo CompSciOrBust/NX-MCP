@@ -18,12 +18,12 @@ class MockTool : public tools::Tool {
   std::string Description() const override { return desc_; }
   nlohmann::json InputSchema() const override { return schema_; }
   tools::ToolResult Execute(const nlohmann::json& args) override {
-    last_args = args;
-    return result;
+    last_args_ = args;
+    return result_;
   }
 
-  tools::ToolResult result{"default result"};
-  nlohmann::json    last_args;
+  tools::ToolResult result_{"default result"};
+  nlohmann::json    last_args_;
 
  private:
   std::string    name_;
@@ -53,25 +53,25 @@ class UnknownThrowTool : public tools::Tool {
 
 struct Fixture {
   Fixture() { tools::ToolRegistry::Instance().Clear(); }
-  services::McpService svc;
+  services::McpService svc_;
 };
 
 // ── Dispatch routing ──────────────────────────────────────────────────────────
 
 TEST_CASE_METHOD(Fixture, "Dispatch: unknown method returns -32601") {
-  auto j = svc.Dispatch("no/such/method", {}, 1);
+  auto j = svc_.Dispatch("no/such/method", {}, 1);
   REQUIRE(j["error"]["code"] == -32601);
 }
 
 TEST_CASE_METHOD(Fixture, "Dispatch: ping returns empty result object") {
-  auto j = svc.Dispatch("ping", {}, 1);
+  auto j = svc_.Dispatch("ping", {}, 1);
   REQUIRE(j.contains("result"));
   REQUIRE(j["result"].is_object());
   REQUIRE(j["result"].empty());
 }
 
 TEST_CASE_METHOD(Fixture, "Dispatch: id is echoed back in response") {
-  auto j = svc.Dispatch("ping", {}, "req-42");
+  auto j = svc_.Dispatch("ping", {}, "req-42");
   REQUIRE(j["id"] == "req-42");
   REQUIRE(j["jsonrpc"] == "2.0");
 }
@@ -79,14 +79,14 @@ TEST_CASE_METHOD(Fixture, "Dispatch: id is echoed back in response") {
 // ── HandleInitialize ──────────────────────────────────────────────────────────
 
 TEST_CASE_METHOD(Fixture, "Initialize: wrong protocol version returns -32022 with version data") {
-  auto j = svc.Dispatch("initialize", {{"protocolVersion", "1999-01-01"}}, 1);
+  auto j = svc_.Dispatch("initialize", {{"protocolVersion", "1999-01-01"}}, 1);
   REQUIRE(j["error"]["code"] == -32022);
   REQUIRE(j["error"]["data"]["requested"] == "1999-01-01");
   REQUIRE(j["error"]["data"]["supported"][0] == mcp::kLegacyVersion);
 }
 
 TEST_CASE_METHOD(Fixture, "Initialize: correct version returns serverInfo and capabilities") {
-  auto j = svc.Dispatch("initialize", {{"protocolVersion", mcp::kLegacyVersion}}, 1);
+  auto j = svc_.Dispatch("initialize", {{"protocolVersion", mcp::kLegacyVersion}}, 1);
   REQUIRE(j.contains("result"));
   REQUIRE(j["result"]["protocolVersion"] == mcp::kLegacyVersion);
   REQUIRE(j["result"]["serverInfo"]["name"] == mcp::kServerName);
@@ -97,7 +97,7 @@ TEST_CASE_METHOD(Fixture, "Initialize: correct version returns serverInfo and ca
 // ── HandleDiscover ────────────────────────────────────────────────────────────
 
 TEST_CASE_METHOD(Fixture, "Discover: returns complete result with supported version") {
-  auto j = svc.Dispatch("server/discover", {}, 1);
+  auto j = svc_.Dispatch("server/discover", {}, 1);
   REQUIRE(j["result"]["resultType"] == "complete");
   REQUIRE(j["result"]["supportedVersions"][0] == mcp::kVersion);
   REQUIRE(j["result"]["capabilities"].contains("tools"));
@@ -107,7 +107,7 @@ TEST_CASE_METHOD(Fixture, "Discover: returns complete result with supported vers
 // ── HandleToolsList ───────────────────────────────────────────────────────────
 
 TEST_CASE_METHOD(Fixture, "ToolsList: empty registry returns empty tools array") {
-  auto j = svc.Dispatch("tools/list", {}, 1);
+  auto j = svc_.Dispatch("tools/list", {}, 1);
   REQUIRE(j["result"]["tools"].is_array());
   REQUIRE(j["result"]["tools"].empty());
 }
@@ -117,7 +117,7 @@ TEST_CASE_METHOD(Fixture, "ToolsList: registered tools appear with name, descrip
   tools::ToolRegistry::Instance().Register(
       std::make_unique<MockTool>("my_tool", "does something", schema));
 
-  auto j = svc.Dispatch("tools/list", {}, 1);
+  auto j = svc_.Dispatch("tools/list", {}, 1);
   auto& tools = j["result"]["tools"];
   REQUIRE(tools.size() == 1);
   REQUIRE(tools[0]["name"] == "my_tool");
@@ -128,29 +128,29 @@ TEST_CASE_METHOD(Fixture, "ToolsList: registered tools appear with name, descrip
 TEST_CASE_METHOD(Fixture, "ToolsList: multiple registered tools all appear") {
   tools::ToolRegistry::Instance().Register(std::make_unique<MockTool>("tool_a"));
   tools::ToolRegistry::Instance().Register(std::make_unique<MockTool>("tool_b"));
-  auto j = svc.Dispatch("tools/list", {}, 1);
+  auto j = svc_.Dispatch("tools/list", {}, 1);
   REQUIRE(j["result"]["tools"].size() == 2);
 }
 
 // ── HandleToolsCall ───────────────────────────────────────────────────────────
 
 TEST_CASE_METHOD(Fixture, "ToolsCall: missing name param returns -32602") {
-  auto j = svc.Dispatch("tools/call", {}, 1);
+  auto j = svc_.Dispatch("tools/call", {}, 1);
   REQUIRE(j["error"]["code"] == -32602);
 }
 
 TEST_CASE_METHOD(Fixture, "ToolsCall: unknown tool name returns -32602") {
-  auto j = svc.Dispatch("tools/call", {{"name", "no_such_tool"}}, 1);
+  auto j = svc_.Dispatch("tools/call", {{"name", "no_such_tool"}}, 1);
   REQUIRE(j["error"]["code"] == -32602);
   REQUIRE(j["error"]["message"] == "Unknown tool: no_such_tool");
 }
 
 TEST_CASE_METHOD(Fixture, "ToolsCall: successful call returns text content") {
   auto owned = std::make_unique<MockTool>("my_tool");
-  owned->result = {"hello world"};
+  owned->result_ = {"hello world"};
   tools::ToolRegistry::Instance().Register(std::move(owned));
 
-  auto j = svc.Dispatch("tools/call", {{"name", "my_tool"}}, 1);
+  auto j = svc_.Dispatch("tools/call", {{"name", "my_tool"}}, 1);
   REQUIRE(j["result"]["isError"] == false);
   REQUIRE(j["result"]["content"][0]["type"] == "text");
   REQUIRE(j["result"]["content"][0]["text"] == "hello world");
@@ -158,20 +158,20 @@ TEST_CASE_METHOD(Fixture, "ToolsCall: successful call returns text content") {
 
 TEST_CASE_METHOD(Fixture, "ToolsCall: error result sets isError true") {
   auto owned = std::make_unique<MockTool>("err_tool");
-  owned->result = {"something failed", true};
+  owned->result_ = {"something failed", true};
   tools::ToolRegistry::Instance().Register(std::move(owned));
 
-  auto j = svc.Dispatch("tools/call", {{"name", "err_tool"}}, 1);
+  auto j = svc_.Dispatch("tools/call", {{"name", "err_tool"}}, 1);
   REQUIRE(j["result"]["isError"] == true);
   REQUIRE(j["result"]["content"][0]["text"] == "something failed");
 }
 
 TEST_CASE_METHOD(Fixture, "ToolsCall: image result returns image content item") {
   auto owned = std::make_unique<MockTool>("img_tool");
-  owned->result = {"", false, "base64data==", "image/png"};
+  owned->result_ = {"", false, "base64data==", "image/png"};
   tools::ToolRegistry::Instance().Register(std::move(owned));
 
-  auto j = svc.Dispatch("tools/call", {{"name", "img_tool"}}, 1);
+  auto j = svc_.Dispatch("tools/call", {{"name", "img_tool"}}, 1);
   REQUIRE(j["result"]["content"][0]["type"] == "image");
   REQUIRE(j["result"]["content"][0]["data"] == "base64data==");
   REQUIRE(j["result"]["content"][0]["mimeType"] == "image/png");
@@ -182,14 +182,14 @@ TEST_CASE_METHOD(Fixture, "ToolsCall: arguments are forwarded to the tool") {
   MockTool* tool = owned.get();
   tools::ToolRegistry::Instance().Register(std::move(owned));
 
-  svc.Dispatch("tools/call", {{"name", "arg_tool"}, {"arguments", {{"key", "val"}}}}, 1);
-  REQUIRE(tool->last_args["key"] == "val");
+  svc_.Dispatch("tools/call", {{"name", "arg_tool"}, {"arguments", {{"key", "val"}}}}, 1);
+  REQUIRE(tool->last_args_["key"] == "val");
 }
 
 TEST_CASE_METHOD(Fixture, "ToolsCall: std::exception from tool is caught and returned as error") {
   tools::ToolRegistry::Instance().Register(std::make_unique<ThrowingTool>());
 
-  auto j = svc.Dispatch("tools/call", {{"name", "throw_tool"}}, 1);
+  auto j = svc_.Dispatch("tools/call", {{"name", "throw_tool"}}, 1);
   REQUIRE(j["result"]["isError"] == true);
   REQUIRE(j["result"]["content"][0]["text"] == "Tool threw exception: something went wrong");
 }
@@ -197,7 +197,7 @@ TEST_CASE_METHOD(Fixture, "ToolsCall: std::exception from tool is caught and ret
 TEST_CASE_METHOD(Fixture, "ToolsCall: unknown exception from tool is caught and returned as error") {
   tools::ToolRegistry::Instance().Register(std::make_unique<UnknownThrowTool>());
 
-  auto j = svc.Dispatch("tools/call", {{"name", "unknown_throw"}}, 1);
+  auto j = svc_.Dispatch("tools/call", {{"name", "unknown_throw"}}, 1);
   REQUIRE(j["result"]["isError"] == true);
   REQUIRE(j["result"]["content"][0]["text"] == "Tool threw unknown exception");
 }
