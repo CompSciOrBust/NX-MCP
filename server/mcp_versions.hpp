@@ -69,6 +69,9 @@ inline constexpr const char* kInstructions =
     "Homebrew: to boot into hbmenu, press A to launch a game then immediately press and hold R throughout the entire launch sequence. "
     "Always use hid_sequence for this — separate tool calls will cause the game to launch in the gap between them while awaiting permission. "
     "Pressing Y in hbmenu launches nxlink, which enables remote deployment and "
-    "debugging of NRO files over the network.\n";
+    "debugging of NRO files over the network.\n"
+    "\n"
+    "Server health: if you suspect the server has crashed, verify with "
+    "curl http://<ip>:57331/ping — a live server returns \"pong\".\n";
 
 }  // namespace mcp

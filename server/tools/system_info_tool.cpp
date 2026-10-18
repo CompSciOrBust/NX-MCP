@@ -13,7 +13,7 @@ static bool kRegistered =
 std::string SystemInfoTool::Name() const { return "get_system_info"; }
 
 std::string SystemInfoTool::Description() const {
-  return "Returns Switch firmware version, Atmosphère version, emuMMC status, and system tick.";
+  return "Returns Switch firmware version, Atmosphère version, emuMMC status, IP address, and system tick.";
 }
 
 nlohmann::json SystemInfoTool::InputSchema() const {
@@ -58,16 +58,30 @@ ToolResult SystemInfoTool::Execute(const nlohmann::json&) {
       (emummc_type == 1) ? "partition" :
       (emummc_type == 2) ? "file"      : "none (sysnand)";
 
-  char buf[320];
+  char ip_str[32] = "unavailable";
+  rc = nifmInitialize(NifmServiceType_User);
+  if (R_SUCCEEDED(rc)) {
+    u32 ip = 0;
+    if (R_SUCCEEDED(nifmGetCurrentIpAddress(&ip))) {
+      snprintf(ip_str, sizeof(ip_str), "%u.%u.%u.%u",
+          (ip >> 0) & 0xFF, (ip >> 8) & 0xFF,
+          (ip >> 16) & 0xFF, (ip >> 24) & 0xFF);
+    }
+    nifmExit();
+  }
+
+  char buf[384];
   snprintf(buf, sizeof(buf),
       "Firmware:   %s (%u.%u.%u)\n"
       "Atmosphere: %u.%u.%u\n"
       "emuMMC:     %s\n"
+      "IP Address: %s\n"
       "Tick:       %llu",
       fw.display_version,
       HOSVER_MAJOR(ver), HOSVER_MINOR(ver), HOSVER_MICRO(ver),
       kAmsMajor, kAmsMinor, kAmsMicro,
       emummc_str,
+      ip_str,
       (unsigned long long)tick);
 
   return {buf, false};

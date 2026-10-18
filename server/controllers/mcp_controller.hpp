@@ -1,15 +1,16 @@
 #pragma once
-#include "types.hpp"
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
+#include "controller.hpp"
 #include "mcp_service.hpp"
 
 namespace controllers {
 
-class McpController {
+class McpController : public IController {
  public:
-  http::Response Handle(const http::Request& req);
+  std::string Path() const override { return "/mcp"; }
+  http::Response Handle(const http::Request& req) override;
 
  private:
   services::McpService mcp_service_;

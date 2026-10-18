@@ -1,8 +1,11 @@
 #pragma once
 #include <cstdint>
 #include <memory>
+#include <vector>
 #include "server.hpp"
+#include "controller.hpp"
 #include "mcp_controller.hpp"
+#include "ping_controller.hpp"
 
 namespace http {
 
@@ -13,7 +16,9 @@ class App {
 
  private:
   std::unique_ptr<IServer> server_;
-  controllers::McpController controller_;
+  controllers::McpController mcp_controller_;
+  controllers::PingController ping_controller_;
+  std::vector<controllers::IController*> controllers_;
 };
 
 }  // namespace http

@@ -39,7 +39,7 @@ std::string PowerTool::Name() const { return "power"; }
 
 std::string PowerTool::Description() const {
   return "Reboots or shuts down the console. "
-         "Poll get_system_info to detect when the console comes back online after a reboot.";
+         "Poll get_system_info or curl /ping to detect when the console comes back online after a reboot.";
 }
 
 nlohmann::json PowerTool::InputSchema() const {
@@ -77,7 +77,7 @@ ToolResult PowerTool::Execute(const nlohmann::json& arguments) {
   threadStart(&power_thread);
 
   if (power_action.reboot_)
-    return {"Rebooting — connection will drop. Poll get_system_info to confirm restart.", false};
+    return {"Rebooting — connection will drop. Poll get_system_info or curl /ping to confirm restart.", false};
   else
     return {"Shutting down — connection will drop.", false};
 }
