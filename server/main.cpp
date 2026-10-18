@@ -38,8 +38,9 @@ void __appInit(void) {
     diagAbortWithResult(MAKERESULT(Module_Libnx, LibnxError_InitFail_SM));
 
   rc = fsInitialize();
-  if (R_FAILED(rc))
+  if (R_FAILED(rc)) {
     diagAbortWithResult(MAKERESULT(Module_Libnx, LibnxError_InitFail_FS));
+  }
   fsdevMountSdmc();
 }
 

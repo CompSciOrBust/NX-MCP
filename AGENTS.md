@@ -27,7 +27,7 @@ JSON serialization uses `nlohmann/json` (`vendor/json`).
 
 Protocol version strings live in `server/mcp_versions.hpp` (`mcp::kVersion = "2026-07-28"`, `mcp::kLegacyVersion = "2025-11-25"`). Do not hardcode version strings elsewhere.
 
-The entrypoint (`server/main.cpp`) uses the standard libnx sysmodule pattern: `__appInit` initializes services (`smInitialize`, `setsysInitialize` to set the host version, `socketInitialize`), then the main loop runs `App::Run()`. `__appExit` tears down `socketExit` and `smExit`. sm is kept open for the module lifetime so tools can call service init functions at runtime.
+The entrypoint (`server/main.cpp`) uses the standard libnx sysmodule pattern: `__appInit` initializes services (`smInitialize`, `setsysInitialize` to set the host version, `socketInitialize`, `fsInitialize`/`fsdevMountSdmc`), then the main loop runs `App::Run()`. `__appExit` tears down in reverse order: `fsdevUnmountAll`/`fsExit`, `socketExit`, `smExit`. sm is kept open for the module lifetime so tools can call service init functions at runtime.
 
 Build with `make` from the `server/` directory. The output is `server/exefs.nsp`. The server listens on port **57331**.
 

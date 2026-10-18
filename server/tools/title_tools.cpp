@@ -38,8 +38,9 @@ nlohmann::json InstalledGamesTool::InputSchema() const {
 
 ToolResult InstalledGamesTool::Execute(const nlohmann::json&) {
   Result rc = nsInitialize();
-  if (R_FAILED(rc))
+  if (R_FAILED(rc)) {
     return {"nsInitialize failed: " + FmtRc(rc), true};
+  }
 
   std::vector<NsApplicationRecord> records;
   s32 offset = 0;
@@ -48,8 +49,9 @@ ToolResult InstalledGamesTool::Execute(const nlohmann::json&) {
     s32 count = 0;
     rc = nsListApplicationRecord(batch, 32, offset, &count);
     if (R_FAILED(rc) || count == 0) break;
-    for (s32 i = 0; i < count; i++)
+    for (s32 i = 0; i < count; i++) {
       records.push_back(batch[i]);
+    }
     offset += count;
   }
 
@@ -110,10 +112,12 @@ nlohmann::json MountSaveTool::InputSchema() const {
 }
 
 ToolResult MountSaveTool::Execute(const nlohmann::json& arguments) {
-  if (!arguments.contains("title_id") || !arguments["title_id"].is_string())
+  if (!arguments.contains("title_id") || !arguments["title_id"].is_string()) {
     return {"title_id required (string)", true};
-  if (!arguments.contains("save_type") || !arguments["save_type"].is_string())
+  }
+  if (!arguments.contains("save_type") || !arguments["save_type"].is_string()) {
     return {"save_type required (\"account\", \"device\", or \"bcat\")", true};
+  }
 
   const u64 title_id = strtoull(
       arguments["title_id"].get<std::string>().c_str(), nullptr, 16);
@@ -122,15 +126,17 @@ ToolResult MountSaveTool::Execute(const nlohmann::json& arguments) {
 
   Result rc;
   if (save_type == "account") {
-    if (!arguments.contains("uid") || !arguments["uid"].is_string())
+    if (!arguments.contains("uid") || !arguments["uid"].is_string()) {
       return {"uid required for account saves", true};
+    }
 
     const std::string uid_str = arguments["uid"].get<std::string>();
     AccountUid uid{};
     if (sscanf(uid_str.c_str(), "%016llx-%016llx",
                (unsigned long long*)&uid.uid[0],
-               (unsigned long long*)&uid.uid[1]) != 2)
+               (unsigned long long*)&uid.uid[1]) != 2) {
       return {"uid format invalid — expected XXXXXXXXXXXXXXXX-XXXXXXXXXXXXXXXX", true};
+    }
 
     rc = fsdevMountSaveData(name.c_str(), title_id, uid);
   } else if (save_type == "device") {
@@ -141,8 +147,9 @@ ToolResult MountSaveTool::Execute(const nlohmann::json& arguments) {
     return {"save_type must be \"account\", \"device\", or \"bcat\"", true};
   }
 
-  if (R_FAILED(rc))
+  if (R_FAILED(rc)) {
     return {"fsdevMount failed: " + FmtRc(rc), true};
+  }
 
   char buf[128];
   snprintf(buf, sizeof(buf), "Mounted as %s:/ — use fs_list_dir/fs_read_file with \"%s:/\" paths.",
@@ -170,8 +177,9 @@ nlohmann::json UnmountSaveTool::InputSchema() const {
 
 ToolResult UnmountSaveTool::Execute(const nlohmann::json& arguments) {
   const std::string name = arguments.value("mount_name", "save");
-  if (fsdevUnmountDevice(name.c_str()) < 0)
+  if (fsdevUnmountDevice(name.c_str()) < 0) {
     return {"failed to unmount \"" + name + "\" — not mounted?", true};
+  }
   return {"Unmounted " + name + ":/", false};
 }
 
@@ -246,8 +254,9 @@ ToolResult ListSaveDataTool::Execute(const nlohmann::json& arguments) {
     rc = fsOpenSaveDataInfoReader(&reader, FsSaveDataSpaceId_All);
   }
 
-  if (R_FAILED(rc))
+  if (R_FAILED(rc)) {
     return {"fsOpenSaveDataInfoReader failed: " + FmtRc(rc), true};
+  }
 
   std::string result;
   char line[128];
@@ -282,8 +291,9 @@ ToolResult ListSaveDataTool::Execute(const nlohmann::json& arguments) {
 
   fsSaveDataInfoReaderClose(&reader);
 
-  if (result.find('\n') == result.rfind('\n'))
+  if (result.find('\n') == result.rfind('\n')) {
     result += "(no save data found)\n";
+  }
 
   return {result, false};
 }
