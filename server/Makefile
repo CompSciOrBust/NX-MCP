@@ -12,9 +12,9 @@ include $(DEVKITPRO)/libnx/switch_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	exefs
 BUILD		:=	build
-SOURCES		:=	. http controllers services tools
+SOURCES		:=	. http controllers services tools ipc
 DATA		:=	data
-INCLUDES	:=	. http controllers services tools ../vendor/json/single_include
+INCLUDES	:=	. http controllers services tools ipc ../vendor/json/single_include
 CONFIG_JSON	:=	sysmodule.json
 #---------------------------------------------------------------------------------
 

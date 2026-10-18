@@ -31,6 +31,20 @@ The entrypoint (`server/main.cpp`) uses the standard libnx sysmodule pattern: `_
 
 Build with `make` from the `server/` directory. The output is `server/exefs.nsp`. The server listens on port **57331**.
 
+#### IPC Service
+
+`server/ipc/` implements a minimal CMIF server that runs on a dedicated thread alongside the HTTP server.
+
+`ipc::StartIpcThread()` is called from `main` before `app.Run()`. It registers the `nx:mcp` system service with `sm` and then loops on `svcReplyAndReceive`, accepting up to 4 concurrent sessions.
+
+Only one command is handled:
+
+| Command ID | Name | Returns |
+|---|---|---|
+| `0` | `GetVersion` | `mcp::Version` (`mcp::kServerVersionInfo`) |
+
+This is the mechanism the launcher uses to check whether the module is running and what version it reports (`launcher/source/version.cpp` queries `nx:mcp` command 0 via `serviceDispatchOut`).
+
 #### MCP Protocol
 
 The server is **dual-era**, supporting both:

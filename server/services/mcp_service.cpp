@@ -4,9 +4,6 @@
 
 namespace services {
 
-static constexpr const char* kServerName = "NX-MCP";
-static constexpr const char* kServerVersion = "0.1.0";
-
 nlohmann::json McpService::Dispatch(const std::string& method,
                                     const nlohmann::json& params,
                                     const nlohmann::json& id) {
@@ -47,7 +44,7 @@ nlohmann::json McpService::HandleInitialize(const nlohmann::json& params,
     {"result", {
       {"protocolVersion", mcp::kLegacyVersion},
       {"capabilities", {{"tools", nlohmann::json::object()}}},
-      {"serverInfo", {{"name", kServerName}, {"version", kServerVersion}}}
+      {"serverInfo", {{"name", mcp::kServerName}, {"version", mcp::kServerVersion}}}
     }}
   };
 }
@@ -62,8 +59,8 @@ nlohmann::json McpService::HandleDiscover(const nlohmann::json& id) {
       {"capabilities", {{"tools", nlohmann::json::object()}}},
       {"_meta", {
         {"io.modelcontextprotocol/serverInfo", {
-          {"name", kServerName},
-          {"version", kServerVersion}
+          {"name", mcp::kServerName},
+          {"version", mcp::kServerVersion}
         }}
       }}
     }}

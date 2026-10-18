@@ -2,6 +2,7 @@
 #include <memory>
 #include "app.hpp"
 #include "socket_server.hpp"
+#include "ipc_service.hpp"
 
 #define INNER_HEAP_SIZE 0x400000
 
@@ -47,6 +48,7 @@ void __appExit(void) {
 #endif
 
 int main(int, char*[]) {
+  ipc::StartIpcThread();
   http::App app(std::make_unique<http::SocketServer>());
   app.Run(57331);
   return 0;

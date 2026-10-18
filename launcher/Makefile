@@ -29,6 +29,8 @@ INCLUDES	:=	$(ARRIBA_DIR)/include \
 				$(ARRIBA_DIR)/include/primitives
 ROMFS		:=	romfs
 APP_TITLE	:=	NX-MCP Launcher
+APP_AUTHOR	:=	CompSciOrBust
+APP_VERSION	:=	1.0.0
 
 #---------------------------------------------------------------------------------
 # options for code generation
