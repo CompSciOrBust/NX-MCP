@@ -20,6 +20,8 @@ static bool kDeleteRegistered =
     ToolRegistry::Instance().Register(std::make_unique<FsDeleteTool>());
 static bool kMkdirRegistered =
     ToolRegistry::Instance().Register(std::make_unique<FsMkdirTool>());
+static bool kCrc32Registered =
+    ToolRegistry::Instance().Register(std::make_unique<FsCrc32Tool>());
 
 // ---- shared helpers --------------------------------------------------------
 
@@ -299,6 +301,57 @@ ToolResult FsMkdirTool::Execute(const nlohmann::json& arguments) {
     return {"Created directory: " + path, false};
 
   return {"failed to create directory: " + path, true};
+}
+
+// ---- FsCrc32Tool -----------------------------------------------------------
+
+std::string FsCrc32Tool::Name() const { return "fs_crc32"; }
+
+std::string FsCrc32Tool::Description() const {
+  return "Computes the CRC32 checksum of a file on the SD card using hardware acceleration.";
+}
+
+nlohmann::json FsCrc32Tool::InputSchema() const {
+  return {
+    {"type", "object"},
+    {"properties", {
+      {"path", {{"type","string"},{"description","File path, e.g. \"sdmc:/atmosphere/config/system_settings.ini\""}}}
+    }},
+    {"required", {"path"}}
+  };
+}
+
+ToolResult FsCrc32Tool::Execute(const nlohmann::json& arguments) {
+  if (!arguments.contains("path") || !arguments["path"].is_string())
+    return {"path required (string)", true};
+
+  const std::string path = arguments["path"].get<std::string>();
+
+  Result rc = FsInit();
+  if (R_FAILED(rc)) return {"fs init failed: " + FmtRc(rc), true};
+
+  FILE* fp = fopen(path.c_str(), "rb");
+  if (!fp) {
+    FsDeinit();
+    return {"cannot open file: " + path, true};
+  }
+
+  static constexpr size_t kChunk = 65536;
+  static uint8_t buf[kChunk];
+
+  u32 crc = 0;
+  size_t total = 0;
+  size_t n;
+  while ((n = fread(buf, 1, kChunk, fp)) > 0) {
+    crc = crc32CalculateWithSeed(crc, buf, n);
+    total += n;
+  }
+  fclose(fp);
+  FsDeinit();
+
+  char out[128];
+  snprintf(out, sizeof(out), "CRC32: 0x%08X  (%zu bytes)", crc, total);
+  return {out, false};
 }
 
 }  // namespace tools

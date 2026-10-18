@@ -18,8 +18,8 @@ This project follows [Google's C++ Style Guide](https://google.github.io/stylegu
 
 Contains the MCP (Model Context Protocol) server, which runs as a Nintendo Switch sysmodule. The architecture is split into three layers:
 
-- **HTTP layer** (`server/http/`) — custom synchronous BSD-socket TCP server (`socket_server.cpp`). `App` owns the `SocketServer` and registers the `/mcp` route. This is the only layer that knows about HTTP.
-- **Controllers** (`server/controllers/`) — one class per route group. Each controller parses the HTTP request, delegates to a service, and writes the HTTP response. No business logic lives here.
+- **HTTP layer** (`server/http/`) — custom synchronous BSD-socket TCP server (`socket_server.cpp`). `App` owns the `SocketServer` and routes `/mcp` and `/ping` through the normal controller dispatch loop, and `/fs/` directly to `FileTransferController` before body buffering occurs. This is the only layer that knows about HTTP.
+- **Controllers** (`server/controllers/`) — one class per route group. Each controller parses the HTTP request, delegates to a service, and writes the HTTP response. No business logic lives here. Controllers that stream large responses (e.g. `FileTransferController`) may write directly to the raw socket via `req.fd` and return `Response::Raw()` (status = 0) to suppress the normal `SendResponse` call in `HandleConnection`.
 - **Services** (`server/services/`) — business logic. Services have no knowledge of HTTP; they receive plain data and return plain data.
 - **Tools** (`server/tools/`) — MCP tools. Each tool inherits from `tools::Tool` and self-registers into `ToolRegistry` via a static initializer in its `.cpp`. The service calls tools polymorphically through the registry with no direct knowledge of individual tools.
 
@@ -60,6 +60,17 @@ The server is **dual-era**, supporting both:
 All HTTP responses use status **200**, including JSON-RPC errors. The only exceptions are 204 (notifications) and 405 (GET on `/mcp`).
 
 The MCP endpoint is `POST /mcp`; `GET /mcp` returns 405.
+
+#### File Transfer
+
+Two streaming endpoints live under `/fs/`. They bypass the body-buffering path in `App` so files of any size are handled with a single 64 KB stack buffer:
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/fs/download?path=<sdmc_path>` | Stream a file from the SD card to the client |
+| `PUT` | `/fs/upload?path=<sdmc_path>` | Stream a file from the client to the SD card |
+
+`FileTransferController` captures `req.fd` in lambdas passed to `FileTransferService`. `on_ready(size)` writes the HTTP response headers directly to the socket; `on_chunk(data, n)` / `on_recv(buf, max)` stream the body. The controller returns `Response::Raw()` when done so `HandleConnection` skips `SendResponse`.
 
 #### Tools
 
