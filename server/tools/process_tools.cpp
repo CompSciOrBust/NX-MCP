@@ -1,5 +1,6 @@
 #include "process_tools.hpp"
 #include "tool_registry.hpp"
+#include "tool_util.hpp"
 #include <switch.h>
 #include <cstdio>
 #include <cstring>
@@ -17,12 +18,6 @@ static bool kLaunchRegistered =
     ToolRegistry::Instance().Register(std::make_unique<PmLaunchTool>());
 
 // ---- shared helpers --------------------------------------------------------
-
-static std::string FmtRc(Result rc) {
-  char buf[12];
-  snprintf(buf, sizeof(buf), "0x%08X", (unsigned)rc);
-  return buf;
-}
 
 static std::string FmtMb(u64 bytes) {
   char buf[32];

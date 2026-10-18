@@ -1,5 +1,6 @@
 #include "hid_input_tools.hpp"
 #include "tool_registry.hpp"
+#include "tool_util.hpp"
 #include <switch.h>
 #include <switch/services/hiddbg.h>
 #include <cstdio>
@@ -19,12 +20,6 @@ static bool kSwipeRegistered =
     ToolRegistry::Instance().Register(std::make_unique<HidSwipeTool>());
 
 // ---- shared helpers --------------------------------------------------------
-
-static std::string FmtRc(Result rc) {
-  char buf[12];
-  snprintf(buf, sizeof(buf), "0x%08X", (unsigned)rc);
-  return buf;
-}
 
 static u64 ParseButtons(const nlohmann::json& arr) {
   struct Entry { const char* name; u64 bit; };

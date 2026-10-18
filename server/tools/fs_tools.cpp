@@ -1,5 +1,6 @@
 #include "fs_tools.hpp"
 #include "tool_registry.hpp"
+#include "tool_util.hpp"
 #include <switch.h>
 #include <cstdio>
 #include <cstring>
@@ -21,12 +22,6 @@ static bool kMkdirRegistered =
     ToolRegistry::Instance().Register(std::make_unique<FsMkdirTool>());
 
 // ---- shared helpers --------------------------------------------------------
-
-static std::string FmtRc(Result rc) {
-  char buf[12];
-  snprintf(buf, sizeof(buf), "0x%08X", (unsigned)rc);
-  return buf;
-}
 
 static Result FsInit() {
   Result rc = fsInitialize();

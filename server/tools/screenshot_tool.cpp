@@ -1,5 +1,6 @@
 #include "screenshot_tool.hpp"
 #include "tool_registry.hpp"
+#include "tool_util.hpp"
 #include <switch.h>
 #include <cstdio>
 #include <string>
@@ -25,12 +26,6 @@ static std::string Base64Encode(const u8* data, size_t len) {
     out += (i + 2 < len) ? kB64[ b        & 0x3F] : '=';
   }
   return out;
-}
-
-static std::string FmtRc(Result rc) {
-  char buf[12];
-  snprintf(buf, sizeof(buf), "0x%08X", (unsigned)rc);
-  return buf;
 }
 
 static u8 jpeg_buf[CAPSSC_JPEG_BUFFER_SIZE];
