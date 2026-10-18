@@ -1,6 +1,6 @@
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
-#include "../tools/tool_registry.hpp"
+#include "../../tools/tool_registry.hpp"
 
 class MockTool : public tools::Tool {
  public:

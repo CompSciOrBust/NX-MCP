@@ -102,12 +102,29 @@ The Makefile auto-discovers all `.cpp` files in `server/tools/` — no Makefile 
 
 Tests use **Catch2 v2** (`vendor/catch2/catch.hpp`). Run with `make run` from `server/tests/`.
 
-Each test file includes only the translation units it needs — tool auto-registrations are excluded so the registry starts empty. `ToolRegistry::Clear()` is called in a fixture to reset state between test cases.
+Each test binary is self-contained — it compiles only the translation units it needs. Tool auto-registrations are excluded so the registry starts empty. `ToolRegistry::Clear()` is called in a fixture to reset state between test cases.
 
-#### Adding Tests
+#### Directory structure
 
-- **Tool tests**: compile the tool's `.cpp` alongside `tools/tool_registry.cpp` and the test file. Add a `build/<tool_name>.o` rule pointing at `../tools/<tool_name>.cpp`.
-- **Service tests**: compile the relevant service `.cpp` and any dependencies (e.g. `tool_registry.cpp`).
+```
+server/tests/
+  Makefile
+  controllers/   — test_<controller>.cpp for each controller
+  services/      — test_<service>.cpp and mock_<service>.cpp
+  tools/         — test_<tool_or_registry>.cpp
+```
+
+#### Mock services
+
+Services that depend on `switch.h` (i.e. `FileTransferService`) cannot be compiled into host tests. Instead, a `mock_<service>.cpp` in `tests/services/` provides a test-only implementation of the same class without the Switch SDK dependency. The mock stores call arguments in `namespace mock` globals and returns a configurable status. Controller tests `extern`-declare those globals to inspect and configure them.
+
+Services with no Switch SDK dependency (e.g. `McpService`) are tested directly using the real implementation.
+
+#### Adding tests
+
+- **Controller tests**: add `test_<controller>.cpp` under `tests/controllers/`. If the controller's service depends on `switch.h`, also add `mock_<service>.cpp` under `tests/services/`. Add a new `run_<name>_tests` target to the Makefile linking the test file, the controller `.cpp`, and the mock (or real) service `.cpp`.
+- **Service tests**: add `test_<service>.cpp` under `tests/services/`. Link the real service `.cpp` and any dependencies (e.g. `tool_registry.cpp`).
+- **Tool tests**: add `test_<tool>.cpp` under `tests/tools/`. Link the tool's `.cpp` alongside `tool_registry.cpp`.
 
 ### `launcher/`
 

@@ -1,22 +1,23 @@
 CXX      := g++
 CXXFLAGS := -std=c++17 -Wall -Wextra \
             -I.. \
+            -I../http \
+            -I../controllers \
+            -I../services \
+            -I../tools \
             -I../../vendor/catch2/single_include \
             -I../../vendor/json/single_include
 
-TARGET := run_tests
-
-SRCS := test_tool_registry.cpp \
-        ../tools/tool_registry.cpp
-
 .PHONY: all clean run
 
-all: $(TARGET)
+all: run_tool_registry_tests run_file_transfer_tests run_ping_tests run_mcp_controller_tests run_mcp_service_tests
 
-$(TARGET): build/test_tool_registry.o build/tool_registry.o
+# ── tool registry ────────────────────────────────────────────────────────────
+
+run_tool_registry_tests: build/test_tool_registry.o build/tool_registry.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-build/test_tool_registry.o: test_tool_registry.cpp
+build/test_tool_registry.o: tools/test_tool_registry.cpp
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
@@ -24,8 +25,78 @@ build/tool_registry.o: ../tools/tool_registry.cpp
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
+# ── file transfer controller ─────────────────────────────────────────────────
+
+run_file_transfer_tests: build/test_file_transfer_controller.o \
+                         build/file_transfer_controller.o \
+                         build/mock_file_transfer_service.o
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
+build/test_file_transfer_controller.o: controllers/test_file_transfer_controller.cpp
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+build/file_transfer_controller.o: ../controllers/file_transfer_controller.cpp
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+build/mock_file_transfer_service.o: services/mock_file_transfer_service.cpp
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+# ── ping controller ──────────────────────────────────────────────────────────
+
+run_ping_tests: build/test_ping_controller.o build/ping_controller.o
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
+build/test_ping_controller.o: controllers/test_ping_controller.cpp
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+build/ping_controller.o: ../controllers/ping_controller.cpp
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+# ── mcp controller ───────────────────────────────────────────────────────────
+
+run_mcp_controller_tests: build/test_mcp_controller.o \
+                           build/mcp_controller.o \
+                           build/mock_mcp_service.o
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
+build/test_mcp_controller.o: controllers/test_mcp_controller.cpp
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+build/mcp_controller.o: ../controllers/mcp_controller.cpp
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+build/mock_mcp_service.o: services/mock_mcp_service.cpp
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+# ── mcp service ──────────────────────────────────────────────────────────────
+
+run_mcp_service_tests: build/test_mcp_service.o build/mcp_service.o build/tool_registry.o
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
+build/test_mcp_service.o: services/test_mcp_service.cpp
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+build/mcp_service.o: ../services/mcp_service.cpp
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+# ─────────────────────────────────────────────────────────────────────────────
+
 clean:
-	rm -rf build $(TARGET)
+	rm -rf build run_tool_registry_tests run_file_transfer_tests run_ping_tests run_mcp_controller_tests run_mcp_service_tests
 
 run: all
-	./$(TARGET)
+	./run_tool_registry_tests
+	./run_file_transfer_tests
+	./run_ping_tests
+	./run_mcp_controller_tests
+	./run_mcp_service_tests
