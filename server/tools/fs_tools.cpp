@@ -25,18 +25,8 @@ static bool kCrc32Registered =
 
 // ---- shared helpers --------------------------------------------------------
 
-static Result FsInit() {
-  Result rc = fsInitialize();
-  if (R_FAILED(rc)) return rc;
-  rc = fsdevMountSdmc();
-  if (R_FAILED(rc)) { fsExit(); return rc; }
-  return 0;
-}
-
-static void FsDeinit() {
-  fsdevUnmountAll();
-  fsExit();
-}
+static Result FsInit() { return 0; }
+static void FsDeinit() {}
 
 // ---- FsListDirTool ---------------------------------------------------------
 

@@ -9,18 +9,8 @@ namespace services {
 static constexpr size_t kChunkSize = 65536;
 static char buf[kChunkSize];
 
-static Result FsInit() {
-  Result rc = fsInitialize();
-  if (R_FAILED(rc)) return rc;
-  rc = fsdevMountSdmc();
-  if (R_FAILED(rc)) { fsExit(); return rc; }
-  return 0;
-}
-
-static void FsDeinit() {
-  fsdevUnmountAll();
-  fsExit();
-}
+static Result FsInit() { return 0; }
+static void FsDeinit() {}
 
 TransferStatus FileTransferService::Download(
     const std::string& path,

@@ -36,9 +36,16 @@ void __appInit(void) {
   rc = socketInitialize(NULL);
   if (R_FAILED(rc))
     diagAbortWithResult(MAKERESULT(Module_Libnx, LibnxError_InitFail_SM));
+
+  rc = fsInitialize();
+  if (R_FAILED(rc))
+    diagAbortWithResult(MAKERESULT(Module_Libnx, LibnxError_InitFail_FS));
+  fsdevMountSdmc();
 }
 
 void __appExit(void) {
+  fsdevUnmountAll();
+  fsExit();
   socketExit();
   smExit();
 }

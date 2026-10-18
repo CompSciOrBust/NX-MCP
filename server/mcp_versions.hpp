@@ -78,6 +78,15 @@ inline constexpr const char* kInstructions =
     "fs_ tools when you don't want to load file contents into context:\n"
     "  Download: curl -s -o <local_path> \"http://<ip>:57331/fs/download?path=<sdmc_path>\"\n"
     "  Upload:   curl -s -X PUT \"http://<ip>:57331/fs/upload?path=<sdmc_path>\" --data-binary @<local_file>\n"
-    "Files are streamed in 64 KB chunks so arbitrarily large files are supported.\n";
+    "Files are streamed in 64 KB chunks so arbitrarily large files are supported.\n"
+    "\n"
+    "Save data — mount_save/unmount_save rules:\n"
+    "  - A save can only be mounted while the owning game is NOT running. Mounting\n"
+    "    while the game is active will fail or corrupt save data.\n"
+    "  - Always unmount_save as soon as you are finished operating on a save.\n"
+    "    Do not leave saves mounted between unrelated tool calls.\n"
+    "  - Mounted saves are accessible via fs_list_dir/fs_read_file/fs_write_file\n"
+    "    and the HTTP transfer endpoints using the mount name as the path prefix\n"
+    "    (e.g. \"save:/\").\n";
 
 }  // namespace mcp
