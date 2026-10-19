@@ -4,9 +4,12 @@
 #include <switch.h>
 #include <cstdio>
 #include <cstring>
+#include <cerrno>
 #include <string>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <minizip/zip.h>
+#include <minizip/unzip.h>
 
 namespace tools {
 
@@ -22,6 +25,10 @@ static bool kMkdirRegistered =
     ToolRegistry::Instance().Register(std::make_unique<FsMkdirTool>());
 static bool kCrc32Registered =
     ToolRegistry::Instance().Register(std::make_unique<FsCrc32Tool>());
+static bool kZipRegistered =
+    ToolRegistry::Instance().Register(std::make_unique<FsZipTool>());
+static bool kUnzipRegistered =
+    ToolRegistry::Instance().Register(std::make_unique<FsUnzipTool>());
 
 // ---- shared helpers --------------------------------------------------------
 
@@ -342,6 +349,214 @@ ToolResult FsCrc32Tool::Execute(const nlohmann::json& arguments) {
   char out[128];
   snprintf(out, sizeof(out), "CRC32: 0x%08X  (%zu bytes)", crc, total);
   return {out, false};
+}
+
+// ---- zip/unzip shared helpers ----------------------------------------------
+
+static constexpr size_t kZipChunk = 32768;
+static uint8_t zip_buf[kZipChunk];
+
+static void MkdirP(const std::string& path) {
+  std::string p = path;
+  for (size_t i = 1; i < p.size(); i++) {
+    if (p[i] == '/') {
+      p[i] = '\0';
+      mkdir(p.c_str(), 0777);
+      p[i] = '/';
+    }
+  }
+  mkdir(p.c_str(), 0777);
+}
+
+static bool ZipAddFile(zipFile zf, const std::string& file_path,
+                       const std::string& entry_name) {
+  FILE* fp = fopen(file_path.c_str(), "rb");
+  if (!fp) return false;
+
+  zip_fileinfo zi{};
+  if (zipOpenNewFileInZip(zf, entry_name.c_str(), &zi,
+                          NULL, 0, NULL, 0, NULL,
+                          Z_DEFLATED, Z_DEFAULT_COMPRESSION) != ZIP_OK) {
+    fclose(fp);
+    return false;
+  }
+
+  bool ok = true;
+  size_t n;
+  while ((n = fread(zip_buf, 1, kZipChunk, fp)) > 0) {
+    if (zipWriteInFileInZip(zf, zip_buf, (unsigned int)n) < 0) {
+      ok = false;
+      break;
+    }
+  }
+  zipCloseFileInZip(zf);
+  fclose(fp);
+  return ok;
+}
+
+static int ZipAddDir(zipFile zf, const std::string& abs_path,
+                     const std::string& entry_prefix) {
+  std::string dir = abs_path;
+  if (!dir.empty() && dir.back() != '/') dir += '/';
+
+  DIR* d = opendir(dir.c_str());
+  if (!d) return 0;
+
+  int count = 0;
+  struct dirent* ent;
+  while ((ent = readdir(d)) != nullptr) {
+    if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0)
+      continue;
+
+    std::string abs_child  = dir + ent->d_name;
+    std::string entry_child = entry_prefix + "/" + ent->d_name;
+
+    struct stat st{};
+    if (stat(abs_child.c_str(), &st) != 0) continue;
+
+    if (S_ISDIR(st.st_mode))
+      count += ZipAddDir(zf, abs_child, entry_child);
+    else if (ZipAddFile(zf, abs_child, entry_child))
+      count++;
+  }
+  closedir(d);
+  return count;
+}
+
+// ---- FsZipTool -------------------------------------------------------------
+
+std::string FsZipTool::Name() const { return "fs_zip"; }
+
+std::string FsZipTool::Description() const {
+  return "Creates a zip archive from a file or directory on the SD card.";
+}
+
+nlohmann::json FsZipTool::InputSchema() const {
+  return {
+    {"type", "object"},
+    {"properties", {
+      {"source", {{"type","string"},{"description","File or directory to zip, e.g. \"sdmc:/atmosphere\""}}},
+      {"dest",   {{"type","string"},{"description","Output zip file path, e.g. \"sdmc:/atmosphere_backup.zip\""}}}
+    }},
+    {"required", {"source", "dest"}}
+  };
+}
+
+ToolResult FsZipTool::Execute(const nlohmann::json& arguments) {
+  if (!arguments.contains("source") || !arguments["source"].is_string())
+    return {"source required (string)", true};
+  if (!arguments.contains("dest") || !arguments["dest"].is_string())
+    return {"dest required (string)", true};
+
+  const std::string src  = arguments["source"].get<std::string>();
+  const std::string dest = arguments["dest"].get<std::string>();
+
+  struct stat st{};
+  if (stat(src.c_str(), &st) != 0)
+    return {"source not found: " + src, true};
+
+  zipFile zf = zipOpen(dest.c_str(), APPEND_STATUS_CREATE);
+  if (!zf)
+    return {"cannot create zip: " + dest, true};
+
+  int count = 0;
+  if (S_ISDIR(st.st_mode)) {
+    // Use the last path component as the top-level entry prefix
+    std::string prefix = src;
+    if (!prefix.empty() && prefix.back() == '/') prefix.pop_back();
+    size_t slash = prefix.rfind('/');
+    if (slash != std::string::npos) prefix = prefix.substr(slash + 1);
+    count = ZipAddDir(zf, src, prefix);
+  } else {
+    size_t slash = src.rfind('/');
+    std::string entry = (slash != std::string::npos) ? src.substr(slash + 1) : src;
+    if (ZipAddFile(zf, src, entry)) count = 1;
+  }
+
+  zipClose(zf, NULL);
+
+  char msg[256];
+  snprintf(msg, sizeof(msg), "Zipped %d file(s) to %s", count, dest.c_str());
+  return {msg, false};
+}
+
+// ---- FsUnzipTool -----------------------------------------------------------
+
+std::string FsUnzipTool::Name() const { return "fs_unzip"; }
+
+std::string FsUnzipTool::Description() const {
+  return "Extracts a zip archive to a directory on the SD card.";
+}
+
+nlohmann::json FsUnzipTool::InputSchema() const {
+  return {
+    {"type", "object"},
+    {"properties", {
+      {"source", {{"type","string"},{"description","Zip file path, e.g. \"sdmc:/backup.zip\""}}},
+      {"dest",   {{"type","string"},{"description","Destination directory, e.g. \"sdmc:/restored\""}}}
+    }},
+    {"required", {"source", "dest"}}
+  };
+}
+
+ToolResult FsUnzipTool::Execute(const nlohmann::json& arguments) {
+  if (!arguments.contains("source") || !arguments["source"].is_string())
+    return {"source required (string)", true};
+  if (!arguments.contains("dest") || !arguments["dest"].is_string())
+    return {"dest required (string)", true};
+
+  const std::string src = arguments["source"].get<std::string>();
+  std::string dest      = arguments["dest"].get<std::string>();
+  if (!dest.empty() && dest.back() != '/') dest += '/';
+
+  unzFile uf = unzOpen(src.c_str());
+  if (!uf)
+    return {"cannot open zip: " + src, true};
+
+  unz_global_info gi{};
+  unzGetGlobalInfo(uf, &gi);
+
+  int extracted = 0, errors = 0;
+
+  for (uLong i = 0; i < gi.number_entry; i++) {
+    char fname[512];
+    unz_file_info fi{};
+    unzGetCurrentFileInfo(uf, &fi, fname, sizeof(fname), NULL, 0, NULL, 0);
+
+    std::string entry(fname);
+    std::string out_path = dest + entry;
+
+    if (!entry.empty() && entry.back() == '/') {
+      MkdirP(out_path.substr(0, out_path.size() - 1));
+    } else {
+      size_t slash = out_path.rfind('/');
+      if (slash != std::string::npos)
+        MkdirP(out_path.substr(0, slash));
+
+      unzOpenCurrentFile(uf);
+      FILE* fp = fopen(out_path.c_str(), "wb");
+      if (fp) {
+        int n;
+        while ((n = unzReadCurrentFile(uf, zip_buf, kZipChunk)) > 0)
+          fwrite(zip_buf, 1, (size_t)n, fp);
+        fclose(fp);
+        extracted++;
+      } else {
+        errors++;
+      }
+      unzCloseCurrentFile(uf);
+    }
+
+    if (i + 1 < gi.number_entry)
+      unzGoToNextFile(uf);
+  }
+
+  unzClose(uf);
+
+  char msg[256];
+  snprintf(msg, sizeof(msg), "Extracted %d file(s) to %s%s",
+           extracted, dest.c_str(), errors > 0 ? " (with errors)" : "");
+  return {msg, errors > 0 && extracted == 0};
 }
 
 }  // namespace tools
