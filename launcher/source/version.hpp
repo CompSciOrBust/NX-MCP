@@ -10,6 +10,6 @@ struct Version {
 };
 
 // Must match mcp::kServerVersionInfo in server/mcp_versions.hpp
-constexpr Version kExpectedVersion = {1, 0, 0, 0};
+constexpr Version kExpectedVersion = {1, 1, 0, 0};
 
 bool QueryModuleVersion(Version* out);

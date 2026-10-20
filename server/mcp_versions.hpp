@@ -14,7 +14,7 @@ struct Version {
   uint8_t pad_;
 };
 
-inline constexpr Version kServerVersionInfo = {1, 0, 0, 0};
+inline constexpr Version kServerVersionInfo = {1, 1, 0, 0};
 
 namespace detail {
 
@@ -49,44 +49,21 @@ inline constexpr const char* kInstructions =
     "\n"
     "Filesystem — use the sdmc:/ prefix for all FS tool paths:\n"
     "  sdmc:/                            SD card root\n"
-    "  sdmc:/atmosphere/crash_reports/   crash logs (.log text report + .bin minidump)\n"
-    "  sdmc:/atmosphere/contents/        per-title LayeredFS patches and sysmodule NSPs\n"
-    "  sdmc:/atmosphere/config/          Atmosphère config (system_settings.ini, etc.)\n"
+    "  sdmc:/atmosphere/crash_reports/   crash logs\n"
+    "  sdmc:/atmosphere/contents/        sysmodule NSPs and LayeredFS patches\n"
+    "  sdmc:/atmosphere/config/          Atmosphère config\n"
     "  sdmc:/switch/                     homebrew NRO applications\n"
     "\n"
-    "Auto-start: Atmosphère launches a sysmodule at boot when the file\n"
-    "  sdmc:/atmosphere/contents/<title_id>/flags/boot2.flag exists (title IDs in paths\n"
-    "  have no 0x prefix). NX-MCP boot2.flag path:\n"
-    "  sdmc:/atmosphere/contents/0100000000057331/flags/boot2.flag\n"
+    "Homebrew: to boot into hbmenu, press A to launch a game then immediately press and "
+    "hold R throughout the entire launch sequence. Always use hid_sequence for this.\n"
     "\n"
-    "Process model: Horizon has three memory pools — Application (foreground game),\n"
-    "Applet (album/overlays), and System (sysmodules/services). pm_list_processes reports\n"
-    "usage of all three. The foreground game is tagged [app].\n"
+    "Server health: curl http://<ip>:57331/ping — a live server returns \"pong\".\n"
     "\n"
-    "Program IDs are 64-bit hex values. Nintendo system titles occupy\n"
-    "0x0100000000000000–0x01FFFFFFFFFFFFFF.\n"
-    "\n"
-    "Homebrew: to boot into hbmenu, press A to launch a game then immediately press and hold R throughout the entire launch sequence. "
-    "Always use hid_sequence for this — separate tool calls will cause the game to launch in the gap between them while awaiting permission. "
-    "Pressing Y in hbmenu launches nxlink, which enables remote deployment and "
-    "debugging of NRO files over the network.\n"
-    "\n"
-    "Server health: if you suspect the server has crashed, verify with "
-    "curl http://<ip>:57331/ping — a live server returns \"pong\".\n"
-    "\n"
-    "Large file transfer — use these HTTP endpoints directly with curl instead of the\n"
-    "fs_ tools when you don't want to load file contents into context:\n"
-    "  Download: curl -s -o <local_path> \"http://<ip>:57331/fs/download?path=<sdmc_path>\"\n"
-    "  Upload:   curl -s -X PUT \"http://<ip>:57331/fs/upload?path=<sdmc_path>\" --data-binary @<local_file>\n"
-    "Files are streamed in 64 KB chunks so arbitrarily large files are supported.\n"
-    "\n"
-    "Save data — mount_save/unmount_save rules:\n"
-    "  - A save can only be mounted while the owning game is NOT running. Mounting\n"
-    "    while the game is active will fail or corrupt save data.\n"
-    "  - Always unmount_save as soon as you are finished operating on a save.\n"
-    "    Do not leave saves mounted between unrelated tool calls.\n"
-    "  - Mounted saves are accessible via fs_list_dir/fs_read_file/fs_write_file\n"
-    "    and the HTTP transfer endpoints using the mount name as the path prefix\n"
-    "    (e.g. \"save:/\").\n";
+    "Detailed documentation is available as MCP resources — fetch them as needed:\n"
+    "  nxmcp://docs/file-transfer       HTTP endpoints for download, upload, and NSP install\n"
+    "  nxmcp://docs/nsp-install         Streaming NSP installer details and error codes\n"
+    "  nxmcp://docs/save-data           Rules for mounting and editing game save data\n"
+    "  nxmcp://docs/process-model       Horizon OS process pools, program IDs, pm_ tools\n"
+    "  nxmcp://docs/sysmodule-install   Atmosphère sysmodule and Tesla overlay layout\n";
 
 }  // namespace mcp

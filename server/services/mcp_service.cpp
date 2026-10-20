@@ -1,6 +1,7 @@
 #include "mcp_service.hpp"
 #include "mcp_versions.hpp"
 #include "tool_registry.hpp"
+#include "resource_registry.hpp"
 #include "led_notif.hpp"
 
 namespace services {
@@ -13,6 +14,8 @@ nlohmann::json McpService::Dispatch(const std::string& method,
   if (method == "server/discover") return HandleDiscover(id);
   if (method == "tools/list") return HandleToolsList(id);
   if (method == "tools/call") return HandleToolsCall(params, id);
+  if (method == "resources/list") return HandleResourcesList(id);
+  if (method == "resources/read") return HandleResourcesRead(params, id);
 
   return {
     {"jsonrpc", "2.0"},
@@ -44,7 +47,7 @@ nlohmann::json McpService::HandleInitialize(const nlohmann::json& params,
     {"id", id},
     {"result", {
       {"protocolVersion", mcp::kLegacyVersion},
-      {"capabilities", {{"tools", nlohmann::json::object()}}},
+      {"capabilities", {{"tools", nlohmann::json::object()}, {"resources", nlohmann::json::object()}}},
       {"serverInfo", {{"name", mcp::kServerName}, {"version", mcp::kServerVersion}}},
       {"instructions", mcp::kInstructions}
     }}
@@ -58,7 +61,7 @@ nlohmann::json McpService::HandleDiscover(const nlohmann::json& id) {
     {"result", {
       {"resultType", "complete"},
       {"supportedVersions", {mcp::kVersion}},
-      {"capabilities", {{"tools", nlohmann::json::object()}}},
+      {"capabilities", {{"tools", nlohmann::json::object()}, {"resources", nlohmann::json::object()}}},
       {"_meta", {
         {"io.modelcontextprotocol/serverInfo", {
           {"name", mcp::kServerName},
@@ -131,6 +134,50 @@ nlohmann::json McpService::HandleToolsCall(const nlohmann::json& params,
       {"resultType", "complete"},
       {"isError", result.is_error},
       {"content", nlohmann::json::array({content_item})}
+    }}
+  };
+}
+
+nlohmann::json McpService::HandleResourcesList(const nlohmann::json& id) {
+  nlohmann::json list = nlohmann::json::array();
+  for (const auto* r : ResourceRegistry::Instance().All()) {
+    list.push_back({
+      {"uri",         r->uri},
+      {"name",        r->name},
+      {"description", r->description},
+      {"mimeType",    r->mime_type}
+    });
+  }
+  return {{"jsonrpc", "2.0"}, {"id", id}, {"result", {{"resources", list}}}};
+}
+
+nlohmann::json McpService::HandleResourcesRead(const nlohmann::json& params,
+                                                const nlohmann::json& id) {
+  if (!params.contains("uri") || !params["uri"].is_string()) {
+    return {
+      {"jsonrpc", "2.0"},
+      {"id", id},
+      {"error", {{"code", -32602}, {"message", "Invalid params: missing uri"}}}
+    };
+  }
+  const std::string uri = params["uri"].get<std::string>();
+  const auto* r = ResourceRegistry::Instance().Get(uri);
+  if (!r) {
+    return {
+      {"jsonrpc", "2.0"},
+      {"id", id},
+      {"error", {{"code", -32002}, {"message", "Resource not found: " + uri}}}
+    };
+  }
+  return {
+    {"jsonrpc", "2.0"},
+    {"id", id},
+    {"result", {
+      {"contents", nlohmann::json::array({{
+        {"uri",      r->uri},
+        {"mimeType", r->mime_type},
+        {"text",     r->text}
+      }})}
     }}
   };
 }

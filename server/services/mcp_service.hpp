@@ -15,6 +15,8 @@ class McpService {
   nlohmann::json HandleDiscover(const nlohmann::json& id);
   nlohmann::json HandleToolsList(const nlohmann::json& id);
   nlohmann::json HandleToolsCall(const nlohmann::json& params, const nlohmann::json& id);
+  nlohmann::json HandleResourcesList(const nlohmann::json& id);
+  nlohmann::json HandleResourcesRead(const nlohmann::json& params, const nlohmann::json& id);
 };
 
 }  // namespace services
