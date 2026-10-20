@@ -63,14 +63,27 @@ The MCP endpoint is `POST /mcp`; `GET /mcp` returns 405.
 
 #### File Transfer
 
-Two streaming endpoints live under `/fs/`. They bypass the body-buffering path in `App` so files of any size are handled with a single 64 KB stack buffer:
+Three streaming endpoints live under `/fs/`. They bypass the body-buffering path in `App` so files of any size are handled with a single 64 KB stack buffer:
 
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/fs/download?path=<sdmc_path>` | Stream a file from the SD card to the client |
 | `PUT` | `/fs/upload?path=<sdmc_path>` | Stream a file from the client to the SD card |
+| `PUT` | `/fs/install/nsp?storage=sd\|nand` | Stream-install an NSP directly into NCM content storage |
 
-`FileTransferController` captures `req.fd` in lambdas passed to `FileTransferService`. `on_ready(size)` writes the HTTP response headers directly to the socket; `on_chunk(data, n)` / `on_recv(buf, max)` stream the body. The controller returns `Response::Raw()` when done so `HandleConnection` skips `SendResponse`.
+`FileTransferController` handles all three routes. Download/upload use `FileTransferService` with callback lambdas. The NSP installer uses `NspInstallService`, which parses the PFS0 container header in memory as bytes arrive and writes each NCA directly to an NCM placeholder — the full NSP is never written to the SD card.
+
+`/fs/install/nsp` query params:
+- `storage=sd` (default) — installs to `NcmStorageId_SdCard`
+- `storage=nand` — installs to `NcmStorageId_BuiltInUser`
+
+Response body is always JSON: `{"success":true}` or `{"success":false,"error":"<reason>"}`. Error values: `invalid_pfs0`, `too_many_files`, `nca_install_failed`, `cnmt_missing`, `cnmt_read_failed`, `cnmt_register_failed`, `record_failed`, `network_error`.
+
+`NspInstallService::Install` streams the PFS0 in a single pass: reads the header + entry table + string table up front (the full manifest is at the front of every NSP), then installs each NCA to an NCM placeholder in order. After all NCAs are written, it reads the CNMT from the `.cnmt.nca` placeholder via `fsOpenFileSystemWithId(FsFileSystemType_ContentMeta)` (no manual crypto needed), constructs the content meta blob for `ncmContentMetaDatabaseSet`, and pushes an NS application record so the title appears in HOME. Ticket (`.tik`) and cert files are drained and discarded.
+
+Known limitations: NCAs using RightsId (title-key) encryption that require a ticket will fail at `cnmt_read_failed` because the system cannot open the CNMT NCA without the title key. Non-standard homebrew-generated NCAs (e.g. NSP forwarders built with custom tooling) may also fail for the same reason.
+
+`FileTransferController` captures `req.fd` in lambdas passed to the services. Download uses `on_ready(size)` to write HTTP response headers directly to the socket then streams the body; it returns `Response::Raw()` so `HandleConnection` skips `SendResponse`. Upload and NSP install return normal `Response::Ok` JSON after completion.
 
 #### Tools
 

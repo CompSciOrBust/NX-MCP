@@ -1,4 +1,5 @@
 #include "file_transfer_controller.hpp"
+#include <switch.h>
 #include <sys/socket.h>
 #include <cstdlib>
 #include <string>
@@ -43,6 +44,15 @@ std::string FileTransferController::ParsePathParam(const std::string& qs) {
   return UrlDecode(qs.substr(pos, end == std::string::npos ? std::string::npos : end - pos));
 }
 
+std::string FileTransferController::ParseStorageParam(const std::string& qs) {
+  const std::string key = "storage=";
+  auto pos = qs.find(key);
+  if (pos == std::string::npos) return {};
+  pos += key.size();
+  auto end = qs.find('&', pos);
+  return qs.substr(pos, end == std::string::npos ? std::string::npos : end - pos);
+}
+
 http::Response FileTransferController::Handle(const http::Request& req) {
   if (req.path == "/fs/download") {
     if (req.method != "GET") return http::Response::MethodNotAllowed();
@@ -50,7 +60,7 @@ http::Response FileTransferController::Handle(const http::Request& req) {
     if (path.empty()) return http::Response::BadRequest("missing path parameter");
 
     int fd = req.fd;
-    auto status = service_.Download(path,
+    auto status = file_service_.Download(path,
       [fd](size_t size) {
         std::string h = "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n"
                         "Content-Length: " + std::to_string(size) +
@@ -79,7 +89,7 @@ http::Response FileTransferController::Handle(const http::Request& req) {
     }
 
     int fd = req.fd;
-    auto status = service_.Upload(path, len,
+    auto status = file_service_.Upload(path, len,
       [fd](char* buf, size_t max) -> ssize_t {
         return ::recv(fd, buf, max, 0);
       });
@@ -89,6 +99,45 @@ http::Response FileTransferController::Handle(const http::Request& req) {
     if (status != services::TransferStatus::Ok)
       return {500, "text/plain", "internal error"};
     return http::Response::Ok("OK", "text/plain");
+  }
+
+  if (req.path == "/fs/install/nsp") {
+    if (req.method != "PUT") return http::Response::MethodNotAllowed();
+
+    std::string storage_val = ParseStorageParam(req.query_string);
+    uint8_t storage_id = NcmStorageId_SdCard;
+    if (storage_val == "nand") storage_id = NcmStorageId_BuiltInUser;
+
+    size_t len = 0;
+    auto it = req.headers.find("content-length");
+    if (it != req.headers.end()) {
+      try { len = std::stoul(it->second); } catch (...) {}
+    }
+
+    int fd = req.fd;
+    auto status = nsp_service_.Install(len, storage_id,
+      [fd](char* buf, size_t max) -> ssize_t {
+        return ::recv(fd, buf, max, 0);
+      });
+
+    if (status == services::NspInstallStatus::kOk)
+      return http::Response::Ok("{\"success\":true}", "application/json");
+
+    const char* error = "unknown";
+    switch (status) {
+      case services::NspInstallStatus::kInvalidPfs0:        error = "invalid_pfs0"; break;
+      case services::NspInstallStatus::kTooManyFiles:       error = "too_many_files"; break;
+      case services::NspInstallStatus::kNcaInstallFailed:   error = "nca_install_failed"; break;
+      case services::NspInstallStatus::kCnmtMissing:        error = "cnmt_missing"; break;
+      case services::NspInstallStatus::kCnmtReadFailed:     error = "cnmt_read_failed"; break;
+      case services::NspInstallStatus::kCnmtRegisterFailed: error = "cnmt_register_failed"; break;
+      case services::NspInstallStatus::kRecordFailed:       error = "record_failed"; break;
+      case services::NspInstallStatus::kNetworkError:       error = "network_error"; break;
+      default: break;
+    }
+    return http::Response::Ok(
+      std::string("{\"success\":false,\"error\":\"") + error + "\"}",
+      "application/json");
   }
 
   return http::Response::NotFound();

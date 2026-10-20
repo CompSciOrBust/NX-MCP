@@ -2,6 +2,7 @@
 #include "controller.hpp"
 #include "types.hpp"
 #include "file_transfer_service.hpp"
+#include "nsp_install_service.hpp"
 #include <string>
 
 namespace controllers {
@@ -13,9 +14,11 @@ class FileTransferController : public IController {
   http::Response Handle(const http::Request& req) override;
 
  private:
-  services::FileTransferService service_;
+  services::FileTransferService file_service_;
+  services::NspInstallService   nsp_service_;
   static bool SendAll(int fd, const char* data, size_t len);
   static std::string ParsePathParam(const std::string& qs);
+  static std::string ParseStorageParam(const std::string& qs);
   static std::string UrlDecode(const std::string& s);
 };
 
