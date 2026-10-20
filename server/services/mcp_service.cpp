@@ -1,6 +1,7 @@
 #include "mcp_service.hpp"
 #include "mcp_versions.hpp"
 #include "tool_registry.hpp"
+#include "led_notif.hpp"
 
 namespace services {
 
@@ -106,6 +107,7 @@ nlohmann::json McpService::HandleToolsCall(const nlohmann::json& params,
 
   const nlohmann::json arguments = params.value("arguments", nlohmann::json::object());
 
+  led::LedGuard guard;
   tools::ToolResult result;
   try {
     result = tool->Execute(arguments);

@@ -3,6 +3,7 @@
 #include "app.hpp"
 #include "socket_server.hpp"
 #include "ipc_service.hpp"
+#include "led_notif.hpp"
 
 #define INNER_HEAP_SIZE 0x400000
 
@@ -37,14 +38,25 @@ void __appInit(void) {
   if (R_FAILED(rc))
     diagAbortWithResult(MAKERESULT(Module_Libnx, LibnxError_InitFail_SM));
 
+  rc = hidInitialize();
+  if (R_FAILED(rc))
+    diagAbortWithResult(MAKERESULT(Module_Libnx, LibnxError_InitFail_HID));
+
+  rc = hidsysInitialize();
+  if (R_FAILED(rc))
+    diagAbortWithResult(MAKERESULT(Module_Libnx, LibnxError_InitFail_HID));
+
   rc = fsInitialize();
-  if (R_FAILED(rc)) {
+  if (R_FAILED(rc))
     diagAbortWithResult(MAKERESULT(Module_Libnx, LibnxError_InitFail_FS));
-  }
+
   fsdevMountSdmc();
 }
 
 void __appExit(void) {
+  led::Exit();
+  hidsysExit();
+  hidExit();
   fsdevUnmountAll();
   fsExit();
   socketExit();
@@ -56,6 +68,7 @@ void __appExit(void) {
 #endif
 
 int main(int, char*[]) {
+  led::Initialize();
   ipc::StartIpcThread();
   http::App app(std::make_unique<http::SocketServer>());
   app.Run(57331);

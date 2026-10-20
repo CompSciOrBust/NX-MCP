@@ -1,4 +1,5 @@
 #include "file_transfer_service.hpp"
+#include "led_notif.hpp"
 #include <sys/stat.h>
 #include <switch.h>
 #include <cstdio>
@@ -16,6 +17,7 @@ TransferStatus FileTransferService::Download(
     const std::string& path,
     std::function<void(size_t)> on_ready,
     std::function<bool(const char*, size_t)> on_chunk) {
+  led::LedGuard guard;
   if (R_FAILED(FsInit())) return TransferStatus::FsInit;
 
   struct stat st{};
@@ -44,6 +46,7 @@ TransferStatus FileTransferService::Download(
 TransferStatus FileTransferService::Upload(
     const std::string& path, size_t len,
     std::function<ssize_t(char*, size_t)> on_recv) {
+  led::LedGuard guard;
   if (R_FAILED(FsInit())) return TransferStatus::FsInit;
 
   FILE* fp = fopen(path.c_str(), "wb");
