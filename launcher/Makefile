@@ -30,7 +30,7 @@ INCLUDES	:=	$(ARRIBA_DIR)/include \
 ROMFS		:=	romfs
 APP_TITLE	:=	NX-MCP Launcher
 APP_AUTHOR	:=	CompSciOrBust
-APP_VERSION	:=	1.0.0
+APP_VERSION	:=	1.1.0
 
 #---------------------------------------------------------------------------------
 # options for code generation

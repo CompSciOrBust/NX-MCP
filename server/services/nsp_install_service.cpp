@@ -1,16 +1,16 @@
 #include "nsp_install_service.hpp"
+#include "fs_service.hpp"
 #include "led_notif.hpp"
 #include <switch.h>
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
-#include <dirent.h>
 #include <string>
 #include <vector>
 
 namespace services {
 
-static constexpr size_t kBufSize = 65536;
+static constexpr size_t kBufSize = FsService::kChunkSize;
 static constexpr size_t kMaxFiles = 256;
 static char s_buf[kBufSize];
 
@@ -125,31 +125,26 @@ static bool ReadCnmtFromPath(const char* nca_path, std::vector<uint8_t>* out) {
   }
 
   bool ok = false;
-  DIR* dir = opendir("nxmcpcnmt:/");
-  if (dir) {
-    struct dirent* ent;
-    while ((ent = readdir(dir)) != nullptr) {
-      size_t nlen = strlen(ent->d_name);
-      const char* suffix = ".cnmt";
-      size_t slen = strlen(suffix);
-      if (nlen >= slen && strcmp(ent->d_name + nlen - slen, suffix) == 0) {
-        std::string cnmt_path = std::string("nxmcpcnmt:/") + ent->d_name;
-        FILE* fp = fopen(cnmt_path.c_str(), "rb");
-        if (fp) {
-          fseek(fp, 0, SEEK_END);
-          long sz = ftell(fp);
-          fseek(fp, 0, SEEK_SET);
-          if (sz > 0) {
-            out->resize(static_cast<size_t>(sz));
-            ok = fread(out->data(), 1, static_cast<size_t>(sz), fp)
-                 == static_cast<size_t>(sz);
-          }
-          fclose(fp);
+  std::vector<DirEntry> entries;
+  FsService::Instance().ListDir("nxmcpcnmt:/", &entries);
+  for (const auto& e : entries) {
+    if (!e.is_dir && e.name.size() >= 5 &&
+        e.name.compare(e.name.size() - 5, 5, ".cnmt") == 0) {
+      std::string cnmt_path = std::string("nxmcpcnmt:/") + e.name;
+      FILE* fp = fopen(cnmt_path.c_str(), "rb");
+      if (fp) {
+        fseek(fp, 0, SEEK_END);
+        long sz = ftell(fp);
+        fseek(fp, 0, SEEK_SET);
+        if (sz > 0) {
+          out->resize(static_cast<size_t>(sz));
+          ok = fread(out->data(), 1, static_cast<size_t>(sz), fp)
+               == static_cast<size_t>(sz);
         }
-        break;
+        fclose(fp);
       }
+      break;
     }
-    closedir(dir);
   }
 
   fsdevUnmountDevice("nxmcpcnmt");

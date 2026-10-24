@@ -20,7 +20,7 @@ Contains the MCP (Model Context Protocol) server, which runs as a Nintendo Switc
 
 - **HTTP layer** (`server/http/`) — custom synchronous BSD-socket TCP server (`socket_server.cpp`). `App` owns the `SocketServer` and routes `/mcp` and `/ping` through the normal controller dispatch loop, and `/fs/` directly to `FileTransferController` before body buffering occurs. This is the only layer that knows about HTTP.
 - **Controllers** (`server/controllers/`) — one class per route group. Each controller parses the HTTP request, delegates to a service, and writes the HTTP response. No business logic lives here. Controllers that stream large responses (e.g. `FileTransferController`) may write directly to the raw socket via `req.fd` and return `Response::Raw()` (status = 0) to suppress the normal `SendResponse` call in `HandleConnection`.
-- **Services** (`server/services/`) — business logic. Services have no knowledge of HTTP; they receive plain data and return plain data.
+- **Services** (`server/services/`) — business logic. Services have no knowledge of HTTP; they receive plain data and return plain data. `FsService` is a Meyer's singleton that owns the shared 64 KB I/O buffer and all POSIX filesystem primitives (`ReadFile`, `WriteFile`, `StreamRead`, `StreamWrite`, `ListDir`, `MkdirP`, `IsDirectory`, `FileSize`); `FileTransferService`, `NspInstallService`, and the fs tools all delegate to it rather than implementing their own file I/O loops.
 - **Tools** (`server/tools/`) — MCP tools. Each tool inherits from `tools::Tool` and self-registers into `ToolRegistry` via a static initializer in its `.cpp`. The service calls tools polymorphically through the registry with no direct knowledge of individual tools.
 
 JSON serialization uses `nlohmann/json` (`vendor/json`).
@@ -63,7 +63,7 @@ The MCP endpoint is `POST /mcp`; `GET /mcp` returns 405.
 
 #### File Transfer
 
-Three streaming endpoints live under `/fs/`. They bypass the body-buffering path in `App` so files of any size are handled with a single 64 KB stack buffer:
+Three streaming endpoints live under `/fs/`. They bypass the body-buffering path in `App` so files of any size are streamed through `FsService`'s 64 KB I/O buffer (a singleton instance member — never allocated on the stack or per-request):
 
 | Method | Path | Description |
 |---|---|---|
@@ -129,9 +129,9 @@ server/tests/
 
 #### Mock services
 
-Services that depend on `switch.h` (i.e. `FileTransferService`) cannot be compiled into host tests. Instead, a `mock_<service>.cpp` in `tests/services/` provides a test-only implementation of the same class without the Switch SDK dependency. The mock stores call arguments in `namespace mock` globals and returns a configurable status. Controller tests `extern`-declare those globals to inspect and configure them.
+Services that depend on `switch.h` (i.e. `FileTransferService`, `NspInstallService`) cannot be compiled into host tests. Instead, a `mock_<service>.cpp` in `tests/services/` provides a test-only implementation of the same class without the Switch SDK dependency. The mock stores call arguments in `namespace mock` globals and returns a configurable status. Controller tests `extern`-declare those globals to inspect and configure them.
 
-Services with no Switch SDK dependency (e.g. `McpService`) are tested directly using the real implementation.
+Services with no Switch SDK dependency are tested directly using the real implementation. This includes `McpService` and `FsService` — `FsService` depends only on POSIX headers (`<cstdio>`, `<dirent.h>`, `<sys/stat.h>`) and compiles on the host without mocking.
 
 #### Adding tests
 

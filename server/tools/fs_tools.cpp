@@ -1,13 +1,12 @@
 #include "fs_tools.hpp"
 #include "tool_registry.hpp"
 #include "tool_util.hpp"
+#include "../services/fs_service.hpp"
 #include <switch.h>
 #include <cstdio>
-#include <cstring>
-#include <cerrno>
-#include <string>
-#include <dirent.h>
 #include <sys/stat.h>
+#include <string>
+#include <vector>
 #include <minizip/zip.h>
 #include <minizip/unzip.h>
 
@@ -29,11 +28,6 @@ static bool kZipRegistered =
     ToolRegistry::Instance().Register(std::make_unique<FsZipTool>());
 static bool kUnzipRegistered =
     ToolRegistry::Instance().Register(std::make_unique<FsUnzipTool>());
-
-// ---- shared helpers --------------------------------------------------------
-
-static Result FsInit() { return 0; }
-static void FsDeinit() {}
 
 // ---- FsListDirTool ---------------------------------------------------------
 
@@ -57,42 +51,22 @@ ToolResult FsListDirTool::Execute(const nlohmann::json& arguments) {
   if (!arguments.contains("path") || !arguments["path"].is_string())
     return {"path required (string, e.g. \"sdmc:/\")", true};
 
-  Result rc = FsInit();
-  if (R_FAILED(rc)) return {"fs init failed: " + FmtRc(rc), true};
+  const std::string path = arguments["path"].get<std::string>();
 
-  std::string path = arguments["path"].get<std::string>();
-  std::string dir_path = path;
-  if (!dir_path.empty() && dir_path.back() != '/')
-    dir_path += '/';
-
-  DIR* dir = opendir(path.c_str());
-  if (!dir) {
-    FsDeinit();
+  std::vector<services::DirEntry> entries;
+  if (!services::FsService::Instance().ListDir(path, &entries))
     return {"cannot open directory: " + path, true};
-  }
 
   std::string out;
-  struct dirent* ent;
-  while ((ent = readdir(dir)) != nullptr) {
-    if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0)
-      continue;
-
-    std::string full = dir_path + ent->d_name;
-    struct stat st{};
-    bool is_dir = false;
-    if (stat(full.c_str(), &st) == 0)
-      is_dir = S_ISDIR(st.st_mode);
-
-    char line[512];
-    if (is_dir)
-      snprintf(line, sizeof(line), "[DIR]  %s\n", ent->d_name);
+  char line[512];
+  for (const auto& e : entries) {
+    if (e.is_dir)
+      snprintf(line, sizeof(line), "[DIR]  %s\n", e.name.c_str());
     else
       snprintf(line, sizeof(line), "[FILE] %s  (%lld bytes)\n",
-          ent->d_name, (long long)st.st_size);
+               e.name.c_str(), (long long)e.size);
     out += line;
   }
-  closedir(dir);
-  FsDeinit();
 
   if (out.empty()) out = "(empty directory)";
   return {out, false};
@@ -132,32 +106,13 @@ ToolResult FsReadFileTool::Execute(const nlohmann::json& arguments) {
   if (arguments.contains("length") && arguments["length"].is_number())
     length = arguments["length"].get<int64_t>();
 
-  const int64_t kMaxLen = 65536;
-  if (length > kMaxLen) length = kMaxLen;
-  if (length < 0)       length = 0;
-
-  Result rc = FsInit();
-  if (R_FAILED(rc)) return {"fs init failed: " + FmtRc(rc), true};
-
-  FILE* fp = fopen(path.c_str(), "rb");
-  if (!fp) {
-    FsDeinit();
+  std::string buf;
+  if (!services::FsService::Instance().ReadFile(path, offset, length, &buf))
     return {"cannot open file: " + path, true};
-  }
-
-  if (offset > 0)
-    fseek(fp, (long)offset, SEEK_SET);
-
-  std::string buf(length, '\0');
-  size_t bytes_read = fread(&buf[0], 1, (size_t)length, fp);
-  fclose(fp);
-  FsDeinit();
-
-  buf.resize(bytes_read);
 
   char header[128];
   snprintf(header, sizeof(header), "Read %zu bytes from offset %lld:\n",
-      bytes_read, (long long)offset);
+      buf.size(), (long long)offset);
 
   return {std::string(header) + buf, false};
 }
@@ -190,21 +145,11 @@ ToolResult FsWriteFileTool::Execute(const nlohmann::json& arguments) {
   const std::string path = arguments["path"].get<std::string>();
   const std::string data = arguments["data"].get<std::string>();
 
-  Result rc = FsInit();
-  if (R_FAILED(rc)) return {"fs init failed: " + FmtRc(rc), true};
-
-  FILE* fp = fopen(path.c_str(), "wb");
-  if (!fp) {
-    FsDeinit();
+  if (!services::FsService::Instance().WriteFile(path, data.data(), data.size()))
     return {"cannot open file for writing: " + path, true};
-  }
-
-  size_t written = fwrite(data.data(), 1, data.size(), fp);
-  fclose(fp);
-  FsDeinit();
 
   char buf[128];
-  snprintf(buf, sizeof(buf), "Wrote %zu bytes to %s", written, path.c_str());
+  snprintf(buf, sizeof(buf), "Wrote %zu bytes to %s", data.size(), path.c_str());
   return {buf, false};
 }
 
@@ -288,13 +233,7 @@ ToolResult FsMkdirTool::Execute(const nlohmann::json& arguments) {
 
   const std::string path = arguments["path"].get<std::string>();
 
-  Result rc = FsInit();
-  if (R_FAILED(rc)) return {"fs init failed: " + FmtRc(rc), true};
-
-  int r = mkdir(path.c_str(), 0777);
-  FsDeinit();
-
-  if (r == 0)
+  if (mkdir(path.c_str(), 0777) == 0)
     return {"Created directory: " + path, false};
 
   return {"failed to create directory: " + path, true};
@@ -324,27 +263,16 @@ ToolResult FsCrc32Tool::Execute(const nlohmann::json& arguments) {
 
   const std::string path = arguments["path"].get<std::string>();
 
-  Result rc = FsInit();
-  if (R_FAILED(rc)) return {"fs init failed: " + FmtRc(rc), true};
-
-  FILE* fp = fopen(path.c_str(), "rb");
-  if (!fp) {
-    FsDeinit();
-    return {"cannot open file: " + path, true};
-  }
-
-  static constexpr size_t kChunk = 65536;
-  static uint8_t buf[kChunk];
-
   u32 crc = 0;
   size_t total = 0;
-  size_t n;
-  while ((n = fread(buf, 1, kChunk, fp)) > 0) {
-    crc = crc32CalculateWithSeed(crc, buf, n);
-    total += n;
-  }
-  fclose(fp);
-  FsDeinit();
+  bool ok = services::FsService::Instance().StreamRead(path,
+      [&](const char* chunk, size_t n) -> bool {
+        crc = crc32CalculateWithSeed(crc, reinterpret_cast<const uint8_t*>(chunk), n);
+        total += n;
+        return true;
+      });
+
+  if (!ok) return {"cannot open file: " + path, true};
 
   char out[128];
   snprintf(out, sizeof(out), "CRC32: 0x%08X  (%zu bytes)", crc, total);
@@ -353,73 +281,45 @@ ToolResult FsCrc32Tool::Execute(const nlohmann::json& arguments) {
 
 // ---- zip/unzip shared helpers ----------------------------------------------
 
-static constexpr size_t kZipChunk = 32768;
-static uint8_t zip_buf[kZipChunk];
-
-static void MkdirP(const std::string& path) {
-  std::string p = path;
-  for (size_t i = 1; i < p.size(); i++) {
-    if (p[i] == '/') {
-      p[i] = '\0';
-      mkdir(p.c_str(), 0777);
-      p[i] = '/';
-    }
-  }
-  mkdir(p.c_str(), 0777);
-}
-
 static bool ZipAddFile(zipFile zf, const std::string& file_path,
                        const std::string& entry_name) {
-  FILE* fp = fopen(file_path.c_str(), "rb");
-  if (!fp) return false;
+  if (services::FsService::Instance().FileSize(file_path) < 0) return false;
 
   zip_fileinfo zi{};
   if (zipOpenNewFileInZip(zf, entry_name.c_str(), &zi,
                           NULL, 0, NULL, 0, NULL,
-                          Z_DEFLATED, Z_DEFAULT_COMPRESSION) != ZIP_OK) {
-    fclose(fp);
+                          Z_DEFLATED, Z_DEFAULT_COMPRESSION) != ZIP_OK)
     return false;
-  }
 
   bool ok = true;
-  size_t n;
-  while ((n = fread(zip_buf, 1, kZipChunk, fp)) > 0) {
-    if (zipWriteInFileInZip(zf, zip_buf, (unsigned int)n) < 0) {
-      ok = false;
-      break;
-    }
-  }
+  services::FsService::Instance().StreamRead(file_path,
+      [&](const char* chunk, size_t n) -> bool {
+        if (zipWriteInFileInZip(zf, chunk, static_cast<unsigned int>(n)) < 0) {
+          ok = false;
+          return false;
+        }
+        return true;
+      });
+
   zipCloseFileInZip(zf);
-  fclose(fp);
   return ok;
 }
 
 static int ZipAddDir(zipFile zf, const std::string& abs_path,
                      const std::string& entry_prefix) {
-  std::string dir = abs_path;
-  if (!dir.empty() && dir.back() != '/') dir += '/';
-
-  DIR* d = opendir(dir.c_str());
-  if (!d) return 0;
+  std::vector<services::DirEntry> entries;
+  if (!services::FsService::Instance().ListDir(abs_path, &entries)) return 0;
 
   int count = 0;
-  struct dirent* ent;
-  while ((ent = readdir(d)) != nullptr) {
-    if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0)
-      continue;
+  for (const auto& e : entries) {
+    std::string abs_child   = abs_path + (abs_path.back() == '/' ? "" : "/") + e.name;
+    std::string entry_child = entry_prefix + "/" + e.name;
 
-    std::string abs_child  = dir + ent->d_name;
-    std::string entry_child = entry_prefix + "/" + ent->d_name;
-
-    struct stat st{};
-    if (stat(abs_child.c_str(), &st) != 0) continue;
-
-    if (S_ISDIR(st.st_mode))
+    if (e.is_dir)
       count += ZipAddDir(zf, abs_child, entry_child);
     else if (ZipAddFile(zf, abs_child, entry_child))
       count++;
   }
-  closedir(d);
   return count;
 }
 
@@ -451,8 +351,9 @@ ToolResult FsZipTool::Execute(const nlohmann::json& arguments) {
   const std::string src  = arguments["source"].get<std::string>();
   const std::string dest = arguments["dest"].get<std::string>();
 
-  struct stat st{};
-  if (stat(src.c_str(), &st) != 0)
+  auto& fs = services::FsService::Instance();
+  bool is_dir = fs.IsDirectory(src);
+  if (!is_dir && fs.FileSize(src) < 0)
     return {"source not found: " + src, true};
 
   zipFile zf = zipOpen(dest.c_str(), APPEND_STATUS_CREATE);
@@ -460,8 +361,7 @@ ToolResult FsZipTool::Execute(const nlohmann::json& arguments) {
     return {"cannot create zip: " + dest, true};
 
   int count = 0;
-  if (S_ISDIR(st.st_mode)) {
-    // Use the last path component as the top-level entry prefix
+  if (is_dir) {
     std::string prefix = src;
     if (!prefix.empty() && prefix.back() == '/') prefix.pop_back();
     size_t slash = prefix.rfind('/');
@@ -516,6 +416,7 @@ ToolResult FsUnzipTool::Execute(const nlohmann::json& arguments) {
   unz_global_info gi{};
   unzGetGlobalInfo(uf, &gi);
 
+  auto& fs = services::FsService::Instance();
   int extracted = 0, errors = 0;
 
   for (uLong i = 0; i < gi.number_entry; i++) {
@@ -527,23 +428,21 @@ ToolResult FsUnzipTool::Execute(const nlohmann::json& arguments) {
     std::string out_path = dest + entry;
 
     if (!entry.empty() && entry.back() == '/') {
-      MkdirP(out_path.substr(0, out_path.size() - 1));
+      fs.MkdirP(out_path.substr(0, out_path.size() - 1));
     } else {
       size_t slash = out_path.rfind('/');
       if (slash != std::string::npos)
-        MkdirP(out_path.substr(0, slash));
+        fs.MkdirP(out_path.substr(0, slash));
 
       unzOpenCurrentFile(uf);
-      FILE* fp = fopen(out_path.c_str(), "wb");
-      if (fp) {
-        int n;
-        while ((n = unzReadCurrentFile(uf, zip_buf, kZipChunk)) > 0)
-          fwrite(zip_buf, 1, (size_t)n, fp);
-        fclose(fp);
+      if (fs.StreamWrite(out_path, static_cast<size_t>(fi.uncompressed_size),
+          [uf](char* buf, size_t n) -> ssize_t {
+            return static_cast<ssize_t>(
+                unzReadCurrentFile(uf, buf, static_cast<unsigned int>(n)));
+          }))
         extracted++;
-      } else {
+      else
         errors++;
-      }
       unzCloseCurrentFile(uf);
     }
 
