@@ -117,31 +117,49 @@ void SocketServer::HandleConnection(int fd) {
   ::close(fd);
 }
 
-void SocketServer::Run(uint16_t port) {
-  int server_fd = ::socket(AF_INET, SOCK_STREAM, 0);
-  if (server_fd < 0)
-    diagAbortWithResult(MAKERESULT(Module_Libnx, LibnxError_InitFail_SM));
+int SocketServer::CreateServerSocket(uint16_t port) {
+  int fd = ::socket(AF_INET, SOCK_STREAM, 0);
+  if (fd < 0) return -1;
 
   int opt = 1;
-  ::setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+  ::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
   sockaddr_in addr{};
   addr.sin_family      = AF_INET;
   addr.sin_addr.s_addr = INADDR_ANY;
   addr.sin_port        = htons(port);
 
-  if (::bind(server_fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0)
-    diagAbortWithResult(MAKERESULT(Module_Libnx, LibnxError_InitFail_SM));
-  if (::listen(server_fd, 8) < 0)
-    diagAbortWithResult(MAKERESULT(Module_Libnx, LibnxError_InitFail_SM));
+  if (::bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0 ||
+      ::listen(fd, 8) < 0) {
+    ::close(fd);
+    return -1;
+  }
+  return fd;
+}
 
+void SocketServer::Run(uint16_t port) {
   while (true) {
-    int client_fd = ::accept(server_fd, nullptr, nullptr);
-    if (client_fd < 0) {
-      svcSleepThread(1000000LL);
+    int server_fd = CreateServerSocket(port);
+    if (server_fd < 0) {
+      svcSleepThread(1000000000LL);
       continue;
     }
-    HandleConnection(client_fd);
+
+    int failures = 0;
+    while (failures < 10) {
+      int client_fd = ::accept(server_fd, nullptr, nullptr);
+      if (client_fd < 0) {
+        failures++;
+        svcSleepThread(100000000LL);
+        continue;
+      }
+      failures = 0;
+      HandleConnection(client_fd);
+    }
+
+    // Consecutive accept failures - socket is likely dead after sleep, recreate it
+    ::close(server_fd);
+    svcSleepThread(500000000LL);
   }
 }
 

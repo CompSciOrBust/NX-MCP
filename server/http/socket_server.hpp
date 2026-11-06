@@ -15,6 +15,7 @@ class SocketServer : public IServer {
   static bool ParseHeaders(int fd, Request& req);
   static void SendResponse(int fd, const Response& resp);
   void HandleConnection(int fd);
+  static int CreateServerSocket(uint16_t port);
 };
 
 }  // namespace http
