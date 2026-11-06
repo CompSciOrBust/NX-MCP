@@ -88,6 +88,14 @@ nlohmann::json IpcCallTool::InputSchema() const {
         {"description","Buffer descriptors (up to 8). Each object: dir (\"in\"|\"out\"|\"inout\"), type (\"alias\"|\"pointer\"|\"auto\", default \"alias\"), fixed (bool). For in/inout buffers set data to the hex-encoded payload. For out/inout buffers set size to the number of bytes to allocate for the receive buffer — its contents are returned hex-encoded in the result. Both data and size may be present on an inout buffer."},
         {"items", {{"type","object"}}}
       }},
+      {"send_pid", {
+        {"type","boolean"},
+        {"description","Send a PID descriptor with the command. Required by AM proxy commands (OpenLibraryAppletProxy etc.). The kernel fills in the caller's PID automatically."}}},
+      {"in_handles", {
+        {"type","array"},
+        {"description","Input copy handles (up to 8), hex-encoded. E.g. [\"0xFFFF8001\"] to pass CUR_PROCESS_HANDLE. Required by some AM commands alongside send_pid."},
+        {"items", {{"type","string"}}}
+      }},
       {"out_handles", {
         {"type","array"},
         {"description","Expected output handles (up to 8). Each item is \"move\" or \"copy\". Returned values can be passed to session on follow-up calls."},
@@ -122,11 +130,27 @@ ToolResult IpcCallTool::Execute(const nlohmann::json& arguments) {
     out_size = (v > 0 && v <= 512) ? (u32)v : 0;
   }
 
+  bool send_pid = arguments.value("send_pid", false);
+
+  Handle in_handles_arr[8] = {};
+  u32 in_num_handles = 0;
+  if (arguments.contains("in_handles") && arguments["in_handles"].is_array()) {
+    const auto& arr = arguments["in_handles"];
+    in_num_handles = (u32)std::min(arr.size(), (size_t)8);
+    for (u32 i = 0; i < in_num_handles; i++) {
+      if (arr[i].is_string())
+        in_handles_arr[i] = (Handle)strtoul(arr[i].get<std::string>().c_str(), nullptr, 16);
+    }
+  }
+
   static u8 buf_store[8][512];
   bool buf_is_readable[8] = {};
   size_t buf_readable_sz[8] = {};
 
   SfDispatchParams disp = {};
+  disp.in_send_pid    = send_pid ? 1 : 0;
+  disp.in_num_handles = in_num_handles;
+  memcpy(disp.in_handles, in_handles_arr, in_num_handles * sizeof(Handle));
   int num_bufs = 0;
 
   auto SetBufAttr = [&](int idx, u32 val) {
