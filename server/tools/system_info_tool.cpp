@@ -13,7 +13,7 @@ static bool kRegistered =
 std::string SystemInfoTool::Name() const { return "get_system_info"; }
 
 std::string SystemInfoTool::Description() const {
-  return "Returns Switch firmware version, Atmosphère version, emuMMC status, IP address, and system tick.";
+  return "Returns Switch firmware version, Atmosphère version, hardware type, emuMMC status, IP address, and system tick.";
 }
 
 nlohmann::json SystemInfoTool::InputSchema() const {
@@ -43,10 +43,12 @@ ToolResult SystemInfoTool::Execute(const nlohmann::json&) {
   // Atmosphere version and emuMMC type via Exosphere config items.
   u64 ams_api = 0;
   u64 emummc_type = 0;
+  u64 hw_type = 0xFF;
   rc = splInitialize();
   if (R_SUCCEEDED(rc)) {
     splGetConfig(kExosphereApiVersion, &ams_api);
     splGetConfig(kExosphereEmummcType, &emummc_type);
+    splGetConfig(SplConfigItem_HardwareType, &hw_type);
     splExit();
   }
 
@@ -57,6 +59,15 @@ ToolResult SystemInfoTool::Execute(const nlohmann::json&) {
   const char* emummc_str =
       (emummc_type == 1) ? "partition" :
       (emummc_type == 2) ? "file"      : "none (sysnand)";
+
+  const char* hw_str =
+      (hw_type ==  0) ? "Icosa (Nintendo Switch (Erista))"      :
+      (hw_type ==  1) ? "Copper (Nintendo Switch (Prototype?))" :
+      (hw_type ==  2) ? "Hoag (Nintendo Switch Lite)"           :
+      (hw_type ==  3) ? "Iowa (Nintendo Switch (Mariko))"       :
+      (hw_type ==  4) ? "Calcio (Nintendo Switch (Prototype?))" :
+      (hw_type ==  5) ? "Aula (Nintendo Switch – OLED Model)"   :
+      (hw_type == 15) ? "Invalid"                               : "unknown";
 
   char ip_str[32] = "unavailable";
   rc = nifmInitialize(NifmServiceType_User);
@@ -70,16 +81,18 @@ ToolResult SystemInfoTool::Execute(const nlohmann::json&) {
     nifmExit();
   }
 
-  char buf[384];
+  char buf[512];
   snprintf(buf, sizeof(buf),
       "Firmware:   %s (%u.%u.%u)\n"
       "Atmosphere: %u.%u.%u\n"
+      "Hardware:   %s\n"
       "emuMMC:     %s\n"
       "IP Address: %s\n"
       "Tick:       %llu",
       fw.display_version,
       HOSVER_MAJOR(ver), HOSVER_MINOR(ver), HOSVER_MICRO(ver),
       kAmsMajor, kAmsMinor, kAmsMicro,
+      hw_str,
       emummc_str,
       ip_str,
       (unsigned long long)tick);
