@@ -1,6 +1,6 @@
 # NX-MCP
 
-A Nintendo Switch [sysmodule](https://switchbrew.org/wiki/Title_list/System_modules) that hosts a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server, letting an LLM control and inspect the console remotely over WiFi.
+A Nintendo Switch [sysmodule](https://switchbrew.org/wiki/Services_API) that hosts a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server, letting an LLM control and inspect the console remotely over WiFi.
 
 The primary use case is **game and software development**: deploy builds to the SD card, launch and kill titles, inspect running processes, manipulate save data, send controller input to drive test scenarios, and capture screenshots - all from the same AI coding session producing the code. Connect Claude Code (or any MCP client) to your Switch and close the loop between writing code and seeing it run on hardware.
 
