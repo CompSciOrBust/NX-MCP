@@ -55,6 +55,8 @@ For other tools, ask the AI how to adapt the above for itself.
 | `fs_delete` | Delete a file or empty directory |
 | `fs_mkdir` | Create a directory |
 | `fs_crc32` | Compute the CRC32 checksum of a file using hardware acceleration |
+| `fs_zip` | Create a zip archive from a file or directory (recursive) |
+| `fs_unzip` | Extract a zip archive to a directory, preserving structure |
 
 ### Processes
 | Tool | Description |
@@ -78,10 +80,15 @@ For other tools, ask the AI how to adapt the above for itself.
 | `ipc_call` | Send a raw CMIF IPC command to any named system service — supply inline data, send/receive buffer descriptors, and optional output handle slots; returns hex-encoded inline output, buffer contents, and handle values |
 | `ipc_close` | Close a kernel session handle previously obtained from `ipc_call` `out_handles` |
 
+### Packages
+| Tool | Description |
+|------|-------------|
+| `nsp_install` | Install an NSP from the SD card into NCM content storage (`sd` or `nand` target; title-key encrypted NSPs not supported) |
+
 ### System
 | Tool | Description |
 |------|-------------|
-| `get_system_info` | Firmware version, Atmosphère version, emuMMC status, IP address, system tick |
+| `get_system_info` | Firmware version, Atmosphère version, hardware type, emuMMC status, IP address, system tick |
 | `list_accounts` | All user accounts with UIDs and nicknames |
 | `power` | Reboot or shut down the console |
 
@@ -93,6 +100,16 @@ The `fs_read_file` and `fs_write_file` tools pass file contents through the MCP 
 |--------|------|-------------|
 | `GET` | `/fs/download?path=<sdmc_path>` | Stream a file from the SD card |
 | `PUT` | `/fs/upload?path=<sdmc_path>` | Stream a file to the SD card |
+| `POST` | `/fs/install/nsp?storage=<sd\|nand>` | Stream an NSP body directly into NCM content storage — no SD staging needed; `storage` defaults to `sd` |
+
+`/fs/install/nsp` requires a `Content-Length` header and returns JSON:
+
+```json
+{"success": true}
+{"success": false, "error": "<code>"}
+```
+
+Error codes: `invalid_pfs0`, `too_many_files`, `nca_install_failed`, `cnmt_missing`, `cnmt_read_failed`, `cnmt_register_failed`, `record_failed`, `network_error`.
 
 ## Launcher
 

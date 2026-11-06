@@ -79,7 +79,7 @@ http::Response FileTransferController::Handle(const http::Request& req) {
   }
 
   if (req.path == "/fs/upload") {
-    if (req.method != "PUT") return http::Response::MethodNotAllowed();
+    if (req.method != "PUT" && req.method != "POST") return http::Response::MethodNotAllowed();
     std::string path = ParsePathParam(req.query_string);
     if (path.empty()) return http::Response::BadRequest("missing path parameter");
     size_t len = 0;
@@ -102,7 +102,7 @@ http::Response FileTransferController::Handle(const http::Request& req) {
   }
 
   if (req.path == "/fs/install/nsp") {
-    if (req.method != "PUT") return http::Response::MethodNotAllowed();
+    if (req.method != "PUT" && req.method != "POST") return http::Response::MethodNotAllowed();
 
     std::string storage_val = ParseStorageParam(req.query_string);
     uint8_t storage_id = NcmStorageId_SdCard;

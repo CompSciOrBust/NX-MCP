@@ -11,6 +11,7 @@ This project follows [Google's C++ Style Guide](https://google.github.io/stylegu
 - Constants (`constexpr`, `const`, enumerators): `kCamelCase`
 - Namespaces: `lowercase`
 - Indentation: 2 spaces
+- No magic numbers — use named `constexpr` constants instead
 
 ## Project Structure
 

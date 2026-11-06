@@ -53,9 +53,14 @@ ResourceRegistry::ResourceRegistry() {
     "NSP Install",
     "How the streaming NSP installer works and its limitations",
     "text/plain",
-    "NSP INSTALL — PUT /fs/install/nsp\n"
+    "NSP INSTALL\n"
     "\n"
-    "Query params:\n"
+    "Two ways to install an NSP:\n"
+    "  HTTP endpoint  PUT /fs/install/nsp  — stream the NSP body directly from the network.\n"
+    "                 Also accepts POST. No SD staging required.\n"
+    "  MCP tool       nsp_install          — installs an NSP already on the SD card.\n"
+    "\n"
+    "HTTP endpoint query params:\n"
     "  storage=sd    install to NcmStorageId_SdCard (default)\n"
     "  storage=nand  install to NcmStorageId_BuiltInUser\n"
     "\n"
@@ -85,8 +90,7 @@ ResourceRegistry::ResourceRegistry() {
     "  5. Pushes an NS application record so the title appears in the HOME menu.\n"
     "\n"
     "Ticket (.tik) and cert files are skipped. Standard-crypto titles work on CFW\n"
-    "without tickets. RightsId-encrypted NSPs (requiring a title key) will fail at\n"
-    "cnmt_read_failed — use Tinfoil for those.\n"
+    "without tickets. RightsId-encrypted NSPs (requiring a title key) will fail.\n"
   });
 
   Register({
