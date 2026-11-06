@@ -66,6 +66,28 @@ For other tools, ask the AI how to adapt the above for itself.
 | `pm_kill` | Terminate a process by PID or program ID |
 | `pm_launch` | Launch a program by program ID |
 
+### Debug
+| Tool | Description |
+|------|-------------|
+| `debug_attach` | Attach the kernel debugger to a process by PID — pauses it immediately and returns all thread registers |
+| `debug_detach` | Close the debug session and detach; the process resumes automatically |
+| `debug_pause` | Break the attached process and return register state of all threads |
+| `debug_resume` | Resume the attached process; debug session stays active for further inspection |
+| `debug_get_threads` | List all threads with full CPU register context (PC, SP, LR, x0–x28); optionally filter by thread ID |
+| `debug_get_registers` | Get full CPU register context (x0–x28, fp, lr, sp, pc, psr) for a specific thread |
+| `debug_set_registers` | Write CPU registers for a specific thread; process must be paused |
+| `debug_get_events` | Return debug events captured at attach/pause — exception type and fault address for crash diagnosis |
+| `debug_read_memory` | Read up to 4096 bytes from the attached process as a hex dump; works while running or paused |
+| `debug_write_memory` | Write bytes to the attached process's memory |
+| `debug_query_memory` | Walk the process memory map from an address, returning up to 64 regions with type and permissions |
+| `debug_copy_memory` | Copy up to 1 MB within the process entirely on-device (no data passes through the model's context) |
+| `debug_fill_memory` | Fill a memory range with a repeated byte pattern — up to 1 MB per call |
+| `debug_backtrace` | Walk the ARM64 call stack via frame pointer chain with offsets relative to code region base |
+| `debug_dump_code` | Dump all executable code regions to `sdmc:/dumps/<pid>/` as flat binaries named by base address |
+| `debug_dump_region` | Dump an arbitrary memory region to the SD card; unreadable subregions are zero-filled |
+| `debug_value_scan` | Cheat-engine style value scanner — `start` scans all readable memory for a value, `filter` narrows existing candidates |
+| `debug_scan_clear` | Discard all candidates stored by `debug_value_scan` to start a fresh scan |
+
 ### Save Data
 | Tool | Description |
 |------|-------------|
