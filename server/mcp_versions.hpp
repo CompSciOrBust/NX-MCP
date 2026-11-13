@@ -45,7 +45,7 @@ inline constexpr const char* kServerVersion = detail::kVersionStr.buf;
 
 inline constexpr const char* kInstructions =
     "You are connected to a Nintendo Switch running Horizon OS via the NX-MCP sysmodule "
-    "(title ID 0x0100000000057331), loaded by Atmosphère custom firmware.\n"
+    "(title ID 0x4200000000057331), loaded by Atmosphère custom firmware.\n"
     "\n"
     "Filesystem — use the sdmc:/ prefix for all FS tool paths:\n"
     "  sdmc:/                            SD card root\n"

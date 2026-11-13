@@ -145,14 +145,14 @@ Services with no Switch SDK dependency are tested directly using the real implem
 A Nintendo Switch homebrew app (NRO) built with the **Arriba** UI framework (`vendor/Arriba`). It acts as a front-end for installing and managing the NX-MCP sysmodule.
 
 **Startup flow:**
-1. Checks for the sysmodule NSP at `sdmc:/atmosphere/contents/0100000000057331/exefs.nsp`.
+1. Checks for the sysmodule NSP at `sdmc:/atmosphere/contents/4200000000057331/exefs.nsp`.
 2. If absent, shows an install prompt that copies `exefs.nsp` from the launcher's own RomFS (bundled at build time).
 3. Once installed, shows the main UI.
 
 **Main UI** — three buttons driven by DPad + A:
 - **Restart Module** — terminates then re-launches the sysmodule via `pmshell`.
 - **Kill Module** — terminates the sysmodule without re-launching.
-- **Toggle Boot2 Flag** — creates or removes `sdmc:/atmosphere/contents/0100000000057331/flags/boot2.flag`, which controls whether Atmosphere auto-starts the module on boot.
+- **Toggle Boot2 Flag** — creates or removes `sdmc:/atmosphere/contents/4200000000057331/flags/boot2.flag`, which controls whether Atmosphere auto-starts the module on boot.
 
 The screen also shows the console's local IP, the MCP port (`57331`), and upload port (`7332`).
 

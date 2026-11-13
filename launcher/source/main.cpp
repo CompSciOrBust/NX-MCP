@@ -6,6 +6,7 @@
 
 #include "version.hpp"
 #include "constants.hpp"
+#include "module.hpp"
 #include "network.hpp"
 #include "ui.hpp"
 
@@ -16,6 +17,10 @@ int main(int argc, char* argv[]) {
   socketInitializeDefault();
   fsInitialize();
   fsdevMountSdmc();
+
+  // Move a pre-1.1.0 install to the current title ID and start it there.
+  if (MigrateLegacyInstall() && InstallNsp())
+    ModuleRestart();
 
   std::string ip = GetLocalIp();
   int upload_fd = SetupUploadServer();
