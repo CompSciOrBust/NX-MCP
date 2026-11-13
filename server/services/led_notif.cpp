@@ -13,6 +13,10 @@ static std::atomic<u64> g_led_off_at{0};  // tick timestamp; 0 = no pending off
 static Thread g_thread;
 static volatile bool g_thread_running = false;
 
+// hid:sys is only opened on first use, so an idle module never talks to hid.
+static Mutex g_hidsys_mutex;
+static bool  g_hidsys_ready = false;
+
 static constexpr HidNpadIdType kNpadTypes[] = {
   HidNpadIdType_Handheld,
   HidNpadIdType_No1, HidNpadIdType_No2, HidNpadIdType_No3, HidNpadIdType_No4,
@@ -20,6 +24,12 @@ static constexpr HidNpadIdType kNpadTypes[] = {
 };
 
 static void ApplyLed(bool on) {
+  mutexLock(&g_hidsys_mutex);
+  if (!g_hidsys_ready) g_hidsys_ready = R_SUCCEEDED(hidsysInitialize());
+  bool ready = g_hidsys_ready;
+  mutexUnlock(&g_hidsys_mutex);
+  if (!ready) return;
+
   HidsysNotificationLedPattern pattern = {};
   if (on) {
     pattern.baseMiniCycleDuration           = 0x0F;
@@ -69,7 +79,11 @@ void Exit() {
   g_thread_running = false;
   threadWaitForExit(&g_thread);
   threadClose(&g_thread);
-  LedOff();
+  if (g_hidsys_ready) {
+    LedOff();
+    hidsysExit();
+    g_hidsys_ready = false;
+  }
 }
 
 LedGuard::LedGuard() {

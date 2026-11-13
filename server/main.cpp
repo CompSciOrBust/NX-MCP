@@ -4,8 +4,13 @@
 #include "socket_server.hpp"
 #include "ipc_service.hpp"
 #include "led_notif.hpp"
+#include "power_monitor.hpp"
 
 #define INNER_HEAP_SIZE 0x400000
+
+static constexpr u64 kQlaunchProgramId  = 0x0100000000001000;
+static constexpr s64 kBootPollNs        = 500000000LL;
+static constexpr s64 kSocketInitRetryNs = 1000000000LL;
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,18 +39,8 @@ void __appInit(void) {
     setsysExit();
   }
 
-  rc = socketInitialize(NULL);
-  if (R_FAILED(rc))
-    diagAbortWithResult(MAKERESULT(Module_Libnx, LibnxError_InitFail_SM));
-
-  rc = hidInitialize();
-  if (R_FAILED(rc))
-    diagAbortWithResult(MAKERESULT(Module_Libnx, LibnxError_InitFail_HID));
-
-  rc = hidsysInitialize();
-  if (R_FAILED(rc))
-    diagAbortWithResult(MAKERESULT(Module_Libnx, LibnxError_InitFail_HID));
-
+  // bsd is brought up in main() once the system has booted (see
+  // WaitForHomeMenu()); hid:sys is opened lazily by led_notif.
   rc = fsInitialize();
   if (R_FAILED(rc))
     diagAbortWithResult(MAKERESULT(Module_Libnx, LibnxError_InitFail_FS));
@@ -55,8 +50,6 @@ void __appInit(void) {
 
 void __appExit(void) {
   led::Exit();
-  hidsysExit();
-  hidExit();
   fsdevUnmountAll();
   fsExit();
   socketExit();
@@ -67,10 +60,33 @@ void __appExit(void) {
 }
 #endif
 
+// boot2 starts SD sysmodules right after Nintendo's own, while AM and the HOME
+// menu are still coming up. Bringing up bsd/hid that early was observed to
+// stall the boot sequence by about a minute, so wait for qlaunch first.
+// Returns immediately when the module is (re)started later.
+static void WaitForHomeMenu() {
+  if (R_FAILED(pmdmntInitialize())) return;
+  u64 pid = 0;
+  while (R_FAILED(pmdmntGetProcessId(&pid, kQlaunchProgramId)))
+    svcSleepThread(kBootPollNs);
+  pmdmntExit();
+}
+
 int main(int, char*[]) {
-  led::Initialize();
   ipc::StartIpcThread();
-  http::App app(std::make_unique<http::SocketServer>());
+  WaitForHomeMenu();
+
+  while (R_FAILED(socketInitialize(NULL)))
+    svcSleepThread(kSocketInitRetryNs);
+
+  led::Initialize();
+
+  auto server = std::make_unique<http::SocketServer>();
+  http::SocketServer* socket_server = server.get();
+  power::Start([socket_server] { socket_server->Suspend(); },
+               [socket_server] { socket_server->Resume(); });
+
+  http::App app(std::move(server));
   app.Run(57331);
   return 0;
 }

@@ -2,6 +2,8 @@
 #include "constants.hpp"
 
 #include <cstdio>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <switch.h>
 
 bool    g_module_running  = false;
@@ -72,4 +74,28 @@ void ModuleKill() {
   snprintf(buf, sizeof(buf), "Kill: 0x%08X%s",
     rc_term, R_SUCCEEDED(rc_term) ? " (ok)" : " (not running)");
   SetStatus(buf);
+}
+
+bool MigrateLegacyInstall() {
+  bool has_nsp   = access(kLegacyNspPath, F_OK) == 0;
+  bool has_boot2 = access(kLegacyBoot2FlagPath, F_OK) == 0;
+  if (!has_nsp && !has_boot2) return false;
+
+  if (R_SUCCEEDED(pmshellInitialize())) {
+    pmshellTerminateProgram(kLegacyProgramId);
+    pmshellExit();
+  }
+
+  remove(kLegacyNspPath);
+  remove(kLegacyBoot2FlagPath);
+  rmdir(kLegacyBoot2FlagsDir);
+  rmdir(kLegacyModuleDir);  // only succeeds if nothing else lives there
+
+  if (has_boot2) {
+    mkdir(kModuleDir, 0777);
+    mkdir(kBoot2FlagsDir, 0777);
+    FILE* f = fopen(kBoot2FlagPath, "w");
+    if (f) fclose(f);
+  }
+  return true;
 }

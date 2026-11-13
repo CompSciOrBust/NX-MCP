@@ -28,7 +28,7 @@ JSON serialization uses `nlohmann/json` (`vendor/json`).
 
 Protocol version strings live in `server/mcp_versions.hpp` (`mcp::kVersion = "2026-07-28"`, `mcp::kLegacyVersion = "2025-11-25"`). Do not hardcode version strings elsewhere.
 
-The entrypoint (`server/main.cpp`) uses the standard libnx sysmodule pattern: `__appInit` initializes services (`smInitialize`, `setsysInitialize` to set the host version, `socketInitialize`, `fsInitialize`/`fsdevMountSdmc`), then the main loop runs `App::Run()`. `__appExit` tears down in reverse order: `fsdevUnmountAll`/`fsExit`, `socketExit`, `smExit`. sm is kept open for the module lifetime so tools can call service init functions at runtime.
+The entrypoint (`server/main.cpp`) uses the standard libnx sysmodule pattern: `__appInit` initializes services (`smInitialize`, `setsysInitialize` to set the host version, `fsInitialize`/`fsdevMountSdmc`). `main` starts the IPC thread, waits until qlaunch is running (boot2 launches the module while the system is still booting, and bringing up bsd/hid that early was observed to stall the boot by about a minute), then calls `socketInitialize`, registers the PSC power module (`services/power_monitor.cpp`, which suspends `SocketServer` before sleep and resumes it on wake) and runs `App::Run()`. `__appExit` tears down in reverse order: `fsdevUnmountAll`/`fsExit`, `socketExit`, `smExit`. sm is kept open for the module lifetime so tools can call service init functions at runtime. Do not add service initialization to `__appInit`; `hid:sys` is opened lazily by `led_notif.cpp`.
 
 Build with `make` from the `server/` directory. The output is `server/exefs.nsp`. The server listens on port **57331**.
 
@@ -145,14 +145,14 @@ Services with no Switch SDK dependency are tested directly using the real implem
 A Nintendo Switch homebrew app (NRO) built with the **Arriba** UI framework (`vendor/Arriba`). It acts as a front-end for installing and managing the NX-MCP sysmodule.
 
 **Startup flow:**
-1. Checks for the sysmodule NSP at `sdmc:/atmosphere/contents/0100000000057331/exefs.nsp`.
+1. Checks for the sysmodule NSP at `sdmc:/atmosphere/contents/4200000000057331/exefs.nsp`.
 2. If absent, shows an install prompt that copies `exefs.nsp` from the launcher's own RomFS (bundled at build time).
 3. Once installed, shows the main UI.
 
 **Main UI** — three buttons driven by DPad + A:
 - **Restart Module** — terminates then re-launches the sysmodule via `pmshell`.
 - **Kill Module** — terminates the sysmodule without re-launching.
-- **Toggle Boot2 Flag** — creates or removes `sdmc:/atmosphere/contents/0100000000057331/flags/boot2.flag`, which controls whether Atmosphere auto-starts the module on boot.
+- **Toggle Boot2 Flag** — creates or removes `sdmc:/atmosphere/contents/4200000000057331/flags/boot2.flag`, which controls whether Atmosphere auto-starts the module on boot.
 
 The screen also shows the console's local IP, the MCP port (`57331`), and upload port (`7332`).
 

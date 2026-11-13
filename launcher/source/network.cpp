@@ -111,7 +111,7 @@ bool HandleUpload(int fd) {
 bool InstallNsp() {
   mkdir("sdmc:/atmosphere", 0777);
   mkdir("sdmc:/atmosphere/contents", 0777);
-  mkdir("sdmc:/atmosphere/contents/0100000000057331", 0777);
+  mkdir(kModuleDir, 0777);
 
   FILE* src = fopen("romfs:/exefs.nsp", "rb");
   if (!src) return false;
