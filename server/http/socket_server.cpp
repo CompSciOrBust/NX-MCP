@@ -1,7 +1,9 @@
 #include "socket_server.hpp"
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <poll.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <switch.h>
 #include <unistd.h>
 #include <algorithm>
@@ -10,6 +12,14 @@
 #include <string>
 
 namespace http {
+
+// Lets Run() notice Suspend() without depending on the listener being woken.
+static constexpr int kAcceptPollMs     = 250;
+// A client that stops talking (e.g. its end vanished while the console was
+// asleep) must not wedge the single serving thread forever.
+static constexpr int kClientTimeoutSec = 30;
+// Upper bound on how long Suspend() holds up the sleep transition.
+static constexpr u64 kSuspendTimeoutNs = 3000000000ULL;
 
 static std::string ToLower(std::string s) {
   std::transform(s.begin(), s.end(), s.begin(),
@@ -137,8 +147,60 @@ int SocketServer::CreateServerSocket(uint16_t port) {
   return fd;
 }
 
+bool SocketServer::IsSuspended() {
+  mutexLock(&mutex_);
+  bool suspended = suspended_;
+  mutexUnlock(&mutex_);
+  return suspended;
+}
+
+void SocketServer::WaitWhileSuspended() {
+  mutexLock(&mutex_);
+  if (suspended_) {
+    idle_ = true;
+    condvarWakeAll(&cond_);
+    while (suspended_) condvarWait(&cond_, &mutex_);
+    idle_ = false;
+  }
+  mutexUnlock(&mutex_);
+}
+
+bool SocketServer::BeginConnection(int fd) {
+  timeval timeout{};
+  timeout.tv_sec = kClientTimeoutSec;
+  ::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+  ::setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+
+  return !IsSuspended();
+}
+
+void SocketServer::Suspend() {
+  mutexLock(&mutex_);
+  suspended_ = true;
+  // No socket calls here: this runs on the PSC thread, and bsd may already be
+  // asleep. Run() polls the listener and closes everything itself; a request
+  // in progress is bounded by the client timeouts.
+
+  u64 deadline = armGetSystemTick() + armNsToTicks(kSuspendTimeoutNs);
+  while (!idle_) {
+    u64 now = armGetSystemTick();
+    if (now >= deadline) break;
+    condvarWaitTimeout(&cond_, &mutex_, armTicksToNs(deadline - now));
+  }
+  mutexUnlock(&mutex_);
+}
+
+void SocketServer::Resume() {
+  mutexLock(&mutex_);
+  suspended_ = false;
+  condvarWakeAll(&cond_);
+  mutexUnlock(&mutex_);
+}
+
 void SocketServer::Run(uint16_t port) {
   while (true) {
+    WaitWhileSuspended();
+
     int server_fd = CreateServerSocket(port);
     if (server_fd < 0) {
       svcSleepThread(1000000000LL);
@@ -146,20 +208,30 @@ void SocketServer::Run(uint16_t port) {
     }
 
     int failures = 0;
-    while (failures < 10) {
-      int client_fd = ::accept(server_fd, nullptr, nullptr);
+    while (failures < 10 && !IsSuspended()) {
+      pollfd pfd{server_fd, POLLIN, 0};
+      int ready = ::poll(&pfd, 1, kAcceptPollMs);
+      if (ready == 0) continue;
+
+      int client_fd = ready > 0 ? ::accept(server_fd, nullptr, nullptr) : -1;
       if (client_fd < 0) {
         failures++;
         svcSleepThread(100000000LL);
         continue;
       }
       failures = 0;
+
+      if (!BeginConnection(client_fd)) {
+        ::close(client_fd);
+        break;
+      }
       HandleConnection(client_fd);
     }
 
     // Consecutive accept failures - socket is likely dead after sleep, recreate it
+    // (or we were suspended for sleep, see Suspend())
     ::close(server_fd);
-    svcSleepThread(500000000LL);
+    if (!IsSuspended()) svcSleepThread(500000000LL);
   }
 }
 

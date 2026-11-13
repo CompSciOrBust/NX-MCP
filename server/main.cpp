@@ -4,6 +4,7 @@
 #include "socket_server.hpp"
 #include "ipc_service.hpp"
 #include "led_notif.hpp"
+#include "power_monitor.hpp"
 
 #define INNER_HEAP_SIZE 0x400000
 
@@ -80,7 +81,12 @@ int main(int, char*[]) {
 
   led::Initialize();
 
-  http::App app(std::make_unique<http::SocketServer>());
+  auto server = std::make_unique<http::SocketServer>();
+  http::SocketServer* socket_server = server.get();
+  power::Start([socket_server] { socket_server->Suspend(); },
+               [socket_server] { socket_server->Resume(); });
+
+  http::App app(std::move(server));
   app.Run(57331);
   return 0;
 }
