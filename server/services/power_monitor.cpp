@@ -30,15 +30,19 @@ static void MonitorThread(void*) {
 
     // libnx's names don't match the order PSC uses them in: going to sleep
     // sends 1, 2 (sleep ready), 3 (essential services sleep ready); waking
-    // sends 4, 1, 0 (fully awake). Stages 3 and 4 run while services such as
-    // fs and bsd are suspended, so the callbacks must not touch them; and
-    // nothing at all may block here, or the transition never completes and
-    // the console can't wake up.
+    // sends 4, 1 (minimum awake), 0 (fully awake). Stages 3 and 4 run while
+    // services such as fs and bsd are suspended, so the callbacks must not
+    // touch them; and nothing at all may block here, or the transition never
+    // completes and the console can't wake up.
+    // Waking for background work during sleep stops at 1, with the network
+    // up but the screen off, so resume there already. On the way down, 1
+    // arrives while running and on_wake is a no-op.
     switch (state) {
       case PscPmState_ReadySleep:
       case PscPmState_ReadyShutdown:
         g_on_sleep();
         break;
+      case PscPmState_ReadyAwaken:
       case PscPmState_Awake:
         g_on_wake();
         break;
