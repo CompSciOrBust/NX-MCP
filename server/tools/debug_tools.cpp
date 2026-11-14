@@ -18,6 +18,15 @@ static Handle g_debug_handle = INVALID_HANDLE;
 static u64 g_debug_pid = 0;
 static Mutex g_debug_mutex;
 
+// svcContinueDebugEvent flags. Without EnableExceptionEvent the kernel doesn't
+// report exceptions (crashes, breakpoint hits) to the debugger and terminates
+// the process instead.
+static constexpr u32 kContinueExceptionHandled     = BIT(0);
+static constexpr u32 kContinueEnableExceptionEvent = BIT(1);
+static constexpr u32 kContinueAll                  = BIT(2);
+static constexpr u32 kContinueFlags =
+    kContinueExceptionHandled | kContinueEnableExceptionEvent | kContinueAll;
+
 // ---- value-scan candidate list -----------------------------------------------
 // Cheat-engine style: start scan builds this list; filter scan removes entries
 // that no longer match. Everything stays on-device until the list shrinks to a
@@ -66,7 +75,7 @@ static void PumpThreadFunc(void*) {
         g_pump_running.store(false, std::memory_order_relaxed);
         return;  // Leave process paused — do NOT call svcContinueDebugEvent.
       }
-      svcContinueDebugEvent(h, 5, nullptr, 0);
+      svcContinueDebugEvent(h, kContinueFlags, nullptr, 0);
     } else {
       svcSleepThread(500'000LL);  // 0.5ms idle poll
     }
@@ -475,7 +484,7 @@ ToolResult DebugResumeTool::Execute(const nlohmann::json&) {
 
   // Drain any events that arrived since attach/last-pause, then continue.
   DrainEvents(g_debug_handle);
-  Result rc = svcContinueDebugEvent(g_debug_handle, 5, nullptr, 0);
+  Result rc = svcContinueDebugEvent(g_debug_handle, kContinueFlags, nullptr, 0);
 
   if (R_SUCCEEDED(rc))
     StartPump();  // keep draining future events so the process stays running
@@ -1173,7 +1182,7 @@ ToolResult DebugDumpCodeTool::Execute(const nlohmann::json& arguments) {
   out += flush_module();  // flush last module if any
 
   if (owned) {
-    svcContinueDebugEvent(debug, 5, nullptr, 0);
+    svcContinueDebugEvent(debug, kContinueFlags, nullptr, 0);
     svcCloseHandle(debug);
   }
 
@@ -1483,7 +1492,7 @@ ToolResult DebugDumpRegionTool::Execute(const nlohmann::json& arguments) {
 
   FILE* f = fopen(out_path.c_str(), "wb");
   if (!f) {
-    if (owned) { svcContinueDebugEvent(debug, 5, nullptr, 0); svcCloseHandle(debug); }
+    if (owned) { svcContinueDebugEvent(debug, kContinueFlags, nullptr, 0); svcCloseHandle(debug); }
     mutexUnlock(&g_debug_mutex);
     return {"fopen failed: " + out_path, true};
   }
@@ -1507,7 +1516,7 @@ ToolResult DebugDumpRegionTool::Execute(const nlohmann::json& arguments) {
   fclose(f);
 
   if (owned) {
-    svcContinueDebugEvent(debug, 5, nullptr, 0);
+    svcContinueDebugEvent(debug, kContinueFlags, nullptr, 0);
     svcCloseHandle(debug);
   }
 
