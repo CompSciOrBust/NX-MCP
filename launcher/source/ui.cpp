@@ -20,6 +20,7 @@ int                       selected     = 0;
 Arriba::Primitives::Text* boot2_text   = nullptr;
 Arriba::Primitives::Text* status_text  = nullptr;
 Arriba::Primitives::Text* version_text = nullptr;
+Arriba::Primitives::Text* ip_text      = nullptr;
 
 void NavigateButtons(Arriba::Elements::Button** btns, int count, int* sel) {
   using namespace Arriba::Input;
@@ -282,7 +283,7 @@ void InitUi(int upload_fd, const std::string& ip, bool module_running, const Ver
   title->transform.position = {w / 2.0f, 55.0f, 0};
   title->setColour({1, 1, 1, 1});
 
-  auto* ip_text = new Arriba::Primitives::Text(ip.c_str(), 30);
+  ip_text = new Arriba::Primitives::Text(ip.c_str(), 30);
   ip_text->transform.position = {w / 2.0f, 98.0f, 0};
   ip_text->setColour({0.6f, 0.6f, 0.6f, 1.0f});
 
@@ -337,6 +338,10 @@ void InitUi(int upload_fd, const std::string& ip, bool module_running, const Ver
   footer->setColour({0.35f, 0.35f, 0.35f, 1.0f});
 
   Arriba::highlightedObject = buttons[0];
+}
+
+void UpdateIpText(const std::string& ip) {
+  if (ip_text) ip_text->setText(ip.c_str());
 }
 
 bool HandleUiInput(int upload_fd) {

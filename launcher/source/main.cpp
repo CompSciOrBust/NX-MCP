@@ -1,4 +1,5 @@
 #include <string>
+#include <chrono>
 #include <unistd.h>
 
 #include <switch.h>
@@ -22,7 +23,6 @@ int main(int argc, char* argv[]) {
   if (MigrateLegacyInstall() && InstallNsp())
     ModuleRestart();
 
-  std::string ip = GetLocalIp();
   int upload_fd = SetupUploadServer();
 
   Version running_version = {};
@@ -50,10 +50,22 @@ int main(int argc, char* argv[]) {
       running_version = kExpectedVersion;
   }
 
+  std::string ip = GetLocalIp();
   InitUi(upload_fd, ip, module_running, running_version);
+  constexpr auto kIpRefreshInterval = std::chrono::seconds(1);
+  auto next_ip_refresh = std::chrono::steady_clock::now() + kIpRefreshInterval;
 
   while (appletMainLoop()) {
     if (HandleUiInput(upload_fd)) break;
+    auto now = std::chrono::steady_clock::now();
+    if (now >= next_ip_refresh) {
+      std::string current_ip = GetLocalIp();
+      if (current_ip != ip) {
+        ip = current_ip;
+        UpdateIpText(ip);
+      }
+      next_ip_refresh = now + kIpRefreshInterval;
+    }
     Arriba::drawFrame();
   }
 
