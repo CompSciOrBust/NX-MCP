@@ -10,11 +10,11 @@ TransferStatus FileTransferService::Download(
     std::function<bool(const char*, size_t)> on_chunk) {
   led::LedGuard guard;
   int64_t size = FsService::Instance().FileSize(path);
-  if (size < 0) return TransferStatus::NotFound;
+  if (size < 0) return TransferStatus::kNotFound;
   on_ready(static_cast<size_t>(size));
   if (!FsService::Instance().StreamRead(path, on_chunk))
-    return TransferStatus::OpenError;
-  return TransferStatus::Ok;
+    return TransferStatus::kOpenError;
+  return TransferStatus::kOk;
 }
 
 TransferStatus FileTransferService::Upload(
@@ -22,8 +22,8 @@ TransferStatus FileTransferService::Upload(
     std::function<ssize_t(char*, size_t)> on_recv) {
   led::LedGuard guard;
   if (!FsService::Instance().StreamWrite(path, len, on_recv))
-    return TransferStatus::Incomplete;
-  return TransferStatus::Ok;
+    return TransferStatus::kIncomplete;
+  return TransferStatus::kOk;
 }
 
 }  // namespace services

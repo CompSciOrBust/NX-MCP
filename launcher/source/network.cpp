@@ -1,5 +1,7 @@
 #include "network.hpp"
+
 #include "constants.hpp"
+#include "error_codes.hpp"
 
 #include <cstdio>
 #include <cstring>
@@ -70,7 +72,7 @@ bool HandleUpload(int fd) {
   size_t content_length = 0;
 
   if (RecvLine(fd, line, sizeof(line)) < 0) {
-    SendResponse(fd, 400);
+    SendResponse(fd, http::errors::kBadRequest);
     return false;
   }
 
@@ -83,13 +85,13 @@ bool HandleUpload(int fd) {
   }
 
   if (content_length == 0) {
-    SendResponse(fd, 400);
+    SendResponse(fd, http::errors::kBadRequest);
     return false;
   }
 
   FILE* f = fopen(kNspPath, "wb");
   if (!f) {
-    SendResponse(fd, 500);
+    SendResponse(fd, http::errors::kInternalServerError);
     return false;
   }
 
@@ -104,7 +106,7 @@ bool HandleUpload(int fd) {
   }
   fclose(f);
 
-  SendResponse(fd, ok ? 200 : 500);
+  SendResponse(fd, ok ? 200 : http::errors::kInternalServerError);
   return ok;
 }
 

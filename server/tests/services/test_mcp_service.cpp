@@ -1,6 +1,7 @@
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
 #include "../../services/mcp_service.hpp"
+#include "error_codes.hpp"
 #include "../../mcp_versions.hpp"
 #include "../../tools/tool_registry.hpp"
 #include "../../tools/tool.hpp"
@@ -60,7 +61,7 @@ struct Fixture {
 
 TEST_CASE_METHOD(Fixture, "Dispatch: unknown method returns -32601") {
   auto j = svc_.Dispatch("no/such/method", {}, 1);
-  REQUIRE(j["error"]["code"] == -32601);
+  REQUIRE(j["error"]["code"] == mcp::errors::kMethodNotFound);
 }
 
 TEST_CASE_METHOD(Fixture, "Dispatch: ping returns empty result object") {
@@ -98,7 +99,7 @@ TEST_CASE_METHOD(Fixture,
       GENERATE(nlohmann::json::object(),
                nlohmann::json{{"protocolVersion", false}});
   const auto response = svc_.Dispatch("initialize", params, 1);
-  REQUIRE(response["error"]["code"] == -32602);
+  REQUIRE(response["error"]["code"] == mcp::errors::kInvalidParams);
 }
 
 TEST_CASE_METHOD(Fixture, "Initialize: correct version returns serverInfo and capabilities") {
@@ -155,12 +156,12 @@ TEST_CASE_METHOD(Fixture, "ToolsList: multiple registered tools all appear") {
 
 TEST_CASE_METHOD(Fixture, "ToolsCall: missing name param returns -32602") {
   auto j = svc_.Dispatch("tools/call", {}, 1);
-  REQUIRE(j["error"]["code"] == -32602);
+  REQUIRE(j["error"]["code"] == mcp::errors::kInvalidParams);
 }
 
 TEST_CASE_METHOD(Fixture, "ToolsCall: unknown tool name returns -32602") {
   auto j = svc_.Dispatch("tools/call", {{"name", "no_such_tool"}}, 1);
-  REQUIRE(j["error"]["code"] == -32602);
+  REQUIRE(j["error"]["code"] == mcp::errors::kInvalidParams);
   REQUIRE(j["error"]["message"] == "Unknown tool: no_such_tool");
 }
 

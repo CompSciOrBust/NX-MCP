@@ -5,8 +5,8 @@
 
 namespace mock {
 
-services::TransferStatus   download_status = services::TransferStatus::Ok;
-services::TransferStatus   upload_status   = services::TransferStatus::Ok;
+services::TransferStatus   download_status = services::TransferStatus::kOk;
+services::TransferStatus   upload_status   = services::TransferStatus::kOk;
 std::string                last_path;
 size_t                     last_len = 0;
 services::NspInstallStatus nsp_status      = services::NspInstallStatus::kOk;
@@ -14,8 +14,8 @@ uint8_t                    last_storage_id = 0;
 size_t                     last_nsp_len    = 0;
 
 void Reset() {
-  download_status = services::TransferStatus::Ok;
-  upload_status   = services::TransferStatus::Ok;
+  download_status = services::TransferStatus::kOk;
+  upload_status   = services::TransferStatus::kOk;
   last_path.clear();
   last_len        = 0;
   nsp_status      = services::NspInstallStatus::kOk;

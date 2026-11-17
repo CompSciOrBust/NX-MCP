@@ -1,4 +1,5 @@
 #include "socket_server.hpp"
+#include "error_codes.hpp"
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <poll.h>
@@ -82,10 +83,18 @@ void SocketServer::SendResponse(int fd, const Response& resp) {
   switch (resp.status) {
     case 200: reason = "OK";                    break;
     case 204: reason = "No Content";            break;
-    case 400: reason = "Bad Request";           break;
-    case 404: reason = "Not Found";             break;
-    case 405: reason = "Method Not Allowed";    break;
-    case 500: reason = "Internal Server Error"; break;
+    case errors::kBadRequest:
+      reason = "Bad Request";
+      break;
+    case errors::kNotFound:
+      reason = "Not Found";
+      break;
+    case errors::kMethodNotAllowed:
+      reason = "Method Not Allowed";
+      break;
+    case errors::kInternalServerError:
+      reason = "Internal Server Error";
+      break;
   }
 
   std::string out;

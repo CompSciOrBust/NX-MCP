@@ -3,10 +3,11 @@
 #include <algorithm>
 #include <string>
 
-#include "mcp_versions.hpp"
-#include "tool_registry.hpp"
-#include "resource_registry.hpp"
+#include "error_codes.hpp"
 #include "led_notif.hpp"
+#include "mcp_versions.hpp"
+#include "resource_registry.hpp"
+#include "tool_registry.hpp"
 
 namespace services {
 
@@ -24,7 +25,9 @@ nlohmann::json McpService::Dispatch(const std::string& method,
   return {
     {"jsonrpc", "2.0"},
     {"id", id},
-    {"error", {{"code", -32601}, {"message", "Method not found"}}}
+    {"error",
+     {{"code", mcp::errors::kMethodNotFound},
+      {"message", "Method not found"}}}
   };
 }
 
@@ -32,12 +35,11 @@ nlohmann::json McpService::HandleInitialize(const nlohmann::json& params,
                                             const nlohmann::json& id) {
   const auto version = params.find("protocolVersion");
   if (version == params.end() || !version->is_string()) {
-    constexpr int kInvalidParams = -32602;
     return {
         {"jsonrpc", "2.0"},
         {"id", id},
         {"error",
-         {{"code", kInvalidParams},
+         {{"code", mcp::errors::kInvalidParams},
            {"message", "Invalid protocol version"}}},
     };
   }
@@ -97,7 +99,9 @@ nlohmann::json McpService::HandleToolsCall(const nlohmann::json& params,
     return {
       {"jsonrpc", "2.0"},
       {"id", id},
-      {"error", {{"code", -32602}, {"message", "Invalid params: missing tool name"}}}
+      {"error",
+       {{"code", mcp::errors::kInvalidParams},
+        {"message", "Invalid params: missing tool name"}}}
     };
   }
 
@@ -107,7 +111,9 @@ nlohmann::json McpService::HandleToolsCall(const nlohmann::json& params,
     return {
       {"jsonrpc", "2.0"},
       {"id", id},
-      {"error", {{"code", -32602}, {"message", "Unknown tool: " + name}}}
+      {"error",
+       {{"code", mcp::errors::kInvalidParams},
+        {"message", "Unknown tool: " + name}}}
     };
   }
 
@@ -160,7 +166,9 @@ nlohmann::json McpService::HandleResourcesRead(const nlohmann::json& params,
     return {
       {"jsonrpc", "2.0"},
       {"id", id},
-      {"error", {{"code", -32602}, {"message", "Invalid params: missing uri"}}}
+      {"error",
+       {{"code", mcp::errors::kInvalidParams},
+        {"message", "Invalid params: missing uri"}}}
     };
   }
   const std::string uri = params["uri"].get<std::string>();
@@ -169,7 +177,9 @@ nlohmann::json McpService::HandleResourcesRead(const nlohmann::json& params,
     return {
       {"jsonrpc", "2.0"},
       {"id", id},
-      {"error", {{"code", -32002}, {"message", "Resource not found: " + uri}}}
+      {"error",
+       {{"code", mcp::errors::kResourceNotFound},
+        {"message", "Resource not found: " + uri}}}
     };
   }
   return {

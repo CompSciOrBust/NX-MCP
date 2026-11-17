@@ -3,19 +3,9 @@
 #include <cstddef>
 #include <sys/types.h>
 
-namespace services {
+#include "error_codes.hpp"
 
-enum class NspInstallStatus {
-  kOk,
-  kInvalidPfs0,
-  kTooManyFiles,
-  kNcaInstallFailed,
-  kCnmtMissing,
-  kCnmtReadFailed,
-  kCnmtRegisterFailed,
-  kRecordFailed,
-  kNetworkError,
-};
+namespace services {
 
 class NspInstallService {
  public:

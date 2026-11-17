@@ -1,4 +1,5 @@
 #include "ipc_service.hpp"
+#include "error_codes.hpp"
 #include "mcp_versions.hpp"
 #include <cstring>
 #include <switch.h>
@@ -35,7 +36,7 @@ static constexpr u32 kCmifDataOffset   = kHipcHeaderWords + kPaddingWords; // TL
 static void ProcessCommand(u32* tls) {
   auto* in_hdr = reinterpret_cast<CmifInHeader*>(tls + kCmifDataOffset);
 
-  Result rc = MAKERESULT(11, 403); // default: unknown command
+  Result rc = MAKERESULT(errors::kCmifModule, errors::kUnknownCommandDescription);
   mcp::Version resp = {};
 
   if (in_hdr->magic_ == kCmifInMagic && in_hdr->command_id_ == kCmdGetVersion) {

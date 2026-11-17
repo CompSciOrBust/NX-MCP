@@ -2,6 +2,8 @@
 #include <map>
 #include <string>
 
+#include "error_codes.hpp"
+
 namespace http {
 
 struct Request {
@@ -27,10 +29,14 @@ struct Response {
     return {200, std::move(ct), std::move(body)};
   }
   static Response NoContent()        { return {204, {}, {}}; }
-  static Response NotFound()         { return {404, "text/plain", "Not Found"}; }
-  static Response MethodNotAllowed() { return {405, "text/plain", "Method Not Allowed"}; }
+  static Response NotFound() {
+    return {errors::kNotFound, "text/plain", "Not Found"};
+  }
+  static Response MethodNotAllowed() {
+    return {errors::kMethodNotAllowed, "text/plain", "Method Not Allowed"};
+  }
   static Response BadRequest(std::string msg = "Bad Request") {
-    return {400, "text/plain", std::move(msg)};
+    return {errors::kBadRequest, "text/plain", std::move(msg)};
   }
   // status=0 signals the connection was handled directly (no SendResponse needed)
   static Response Raw() { return {0, {}, {}}; }

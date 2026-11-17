@@ -2,6 +2,7 @@
 #include <catch2/catch.hpp>
 #include <switch.h>
 #include "../../controllers/file_transfer_controller.hpp"
+#include "error_codes.hpp"
 #include "../../services/nsp_install_service.hpp"
 
 namespace mock {
@@ -42,27 +43,27 @@ TEST_CASE_METHOD(Fixture, "StreamsBody returns true") {
 // ── routing / method validation ──────────────────────────────────────────────
 
 TEST_CASE_METHOD(Fixture, "Download: wrong method returns 405") {
-  REQUIRE(ctrl_.Handle(MakeReq("PUT", "/fs/download", "path=foo")).status == 405);
+  REQUIRE(ctrl_.Handle(MakeReq("PUT", "/fs/download", "path=foo")).status == http::errors::kMethodNotAllowed);
 }
 
 TEST_CASE_METHOD(Fixture, "Download: missing path param returns 400") {
   auto resp = ctrl_.Handle(MakeReq("GET", "/fs/download"));
-  REQUIRE(resp.status == 400);
+  REQUIRE(resp.status == http::errors::kBadRequest);
   REQUIRE(resp.body == "missing path parameter");
 }
 
 TEST_CASE_METHOD(Fixture, "Upload: wrong method returns 405") {
-  REQUIRE(ctrl_.Handle(MakeReq("GET", "/fs/upload", "path=foo")).status == 405);
+  REQUIRE(ctrl_.Handle(MakeReq("GET", "/fs/upload", "path=foo")).status == http::errors::kMethodNotAllowed);
 }
 
 TEST_CASE_METHOD(Fixture, "Upload: missing path param returns 400") {
   auto resp = ctrl_.Handle(MakeReq("PUT", "/fs/upload"));
-  REQUIRE(resp.status == 400);
+  REQUIRE(resp.status == http::errors::kBadRequest);
   REQUIRE(resp.body == "missing path parameter");
 }
 
 TEST_CASE_METHOD(Fixture, "Unknown /fs/ path returns 404") {
-  REQUIRE(ctrl_.Handle(MakeReq("GET", "/fs/other")).status == 404);
+  REQUIRE(ctrl_.Handle(MakeReq("GET", "/fs/other")).status == http::errors::kNotFound);
 }
 
 // ── download service status mapping ─────────────────────────────────────────
@@ -72,18 +73,18 @@ TEST_CASE_METHOD(Fixture, "Download: Ok returns Raw response") {
 }
 
 TEST_CASE_METHOD(Fixture, "Download: NotFound returns 404") {
-  mock::download_status = services::TransferStatus::NotFound;
-  REQUIRE(ctrl_.Handle(MakeReq("GET", "/fs/download", "path=foo")).status == 404);
+  mock::download_status = services::TransferStatus::kNotFound;
+  REQUIRE(ctrl_.Handle(MakeReq("GET", "/fs/download", "path=foo")).status == http::errors::kNotFound);
 }
 
 TEST_CASE_METHOD(Fixture, "Download: FsInit error returns 500") {
-  mock::download_status = services::TransferStatus::FsInit;
-  REQUIRE(ctrl_.Handle(MakeReq("GET", "/fs/download", "path=foo")).status == 500);
+  mock::download_status = services::TransferStatus::kFsInit;
+  REQUIRE(ctrl_.Handle(MakeReq("GET", "/fs/download", "path=foo")).status == http::errors::kInternalServerError);
 }
 
 TEST_CASE_METHOD(Fixture, "Download: OpenError returns 500") {
-  mock::download_status = services::TransferStatus::OpenError;
-  REQUIRE(ctrl_.Handle(MakeReq("GET", "/fs/download", "path=foo")).status == 500);
+  mock::download_status = services::TransferStatus::kOpenError;
+  REQUIRE(ctrl_.Handle(MakeReq("GET", "/fs/download", "path=foo")).status == http::errors::kInternalServerError);
 }
 
 // ── upload service status mapping ────────────────────────────────────────────
@@ -93,20 +94,20 @@ TEST_CASE_METHOD(Fixture, "Upload: Ok returns 200") {
 }
 
 TEST_CASE_METHOD(Fixture, "Upload: Incomplete returns 500 with message") {
-  mock::upload_status = services::TransferStatus::Incomplete;
+  mock::upload_status = services::TransferStatus::kIncomplete;
   auto resp = ctrl_.Handle(MakeReq("PUT", "/fs/upload", "path=foo"));
-  REQUIRE(resp.status == 500);
+  REQUIRE(resp.status == http::errors::kInternalServerError);
   REQUIRE(resp.body == "transfer incomplete");
 }
 
 TEST_CASE_METHOD(Fixture, "Upload: FsInit error returns 500") {
-  mock::upload_status = services::TransferStatus::FsInit;
-  REQUIRE(ctrl_.Handle(MakeReq("PUT", "/fs/upload", "path=foo")).status == 500);
+  mock::upload_status = services::TransferStatus::kFsInit;
+  REQUIRE(ctrl_.Handle(MakeReq("PUT", "/fs/upload", "path=foo")).status == http::errors::kInternalServerError);
 }
 
 TEST_CASE_METHOD(Fixture, "Upload: OpenError returns 500") {
-  mock::upload_status = services::TransferStatus::OpenError;
-  REQUIRE(ctrl_.Handle(MakeReq("PUT", "/fs/upload", "path=foo")).status == 500);
+  mock::upload_status = services::TransferStatus::kOpenError;
+  REQUIRE(ctrl_.Handle(MakeReq("PUT", "/fs/upload", "path=foo")).status == http::errors::kInternalServerError);
 }
 
 // ── URL decoding and path parsing ────────────────────────────────────────────
@@ -141,7 +142,7 @@ TEST_CASE_METHOD(Fixture, "Upload: content-length is forwarded to service") {
 // ── NSP install routing ──────────────────────────────────────────────────────
 
 TEST_CASE_METHOD(Fixture, "NSP Install: wrong method returns 405") {
-  REQUIRE(ctrl_.Handle(MakeReq("GET", "/fs/install/nsp")).status == 405);
+  REQUIRE(ctrl_.Handle(MakeReq("GET", "/fs/install/nsp")).status == http::errors::kMethodNotAllowed);
 }
 
 // ── NSP install service status mapping ──────────────────────────────────────

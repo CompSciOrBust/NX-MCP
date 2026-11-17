@@ -3,9 +3,9 @@
 #include <functional>
 #include <string>
 
-namespace services {
+#include "error_codes.hpp"
 
-enum class TransferStatus { Ok, FsInit, NotFound, OpenError, Incomplete };
+namespace services {
 
 class FileTransferService {
  public:

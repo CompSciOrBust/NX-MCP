@@ -22,7 +22,8 @@ SOURCES		:=	source \
 				$(ARRIBA_DIR)/source/primitives \
 				$(ARRIBA_DIR)/source/elements
 DATA		:=	data
-INCLUDES	:=	$(ARRIBA_DIR)/include \
+INCLUDES	:=	../common \
+				$(ARRIBA_DIR)/include \
 				$(ARRIBA_DIR)/include/elements \
 				$(ARRIBA_DIR)/include/font \
 				$(ARRIBA_DIR)/include/input \

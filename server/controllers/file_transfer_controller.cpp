@@ -1,4 +1,5 @@
 #include "file_transfer_controller.hpp"
+#include "error_codes.hpp"
 #include <switch.h>
 #include <sys/socket.h>
 #include <cstdlib>
@@ -71,10 +72,10 @@ http::Response FileTransferController::Handle(const http::Request& req) {
         return SendAll(fd, data, n);
       });
 
-    if (status == services::TransferStatus::NotFound)
+    if (status == services::TransferStatus::kNotFound)
       return http::Response::NotFound();
-    if (status != services::TransferStatus::Ok)
-      return {500, "text/plain", "internal error"};
+    if (status != services::TransferStatus::kOk)
+      return {http::errors::kInternalServerError, "text/plain", "internal error"};
     return http::Response::Raw();
   }
 
@@ -94,10 +95,10 @@ http::Response FileTransferController::Handle(const http::Request& req) {
         return ::recv(fd, buf, max, 0);
       });
 
-    if (status == services::TransferStatus::Incomplete)
-      return {500, "text/plain", "transfer incomplete"};
-    if (status != services::TransferStatus::Ok)
-      return {500, "text/plain", "internal error"};
+    if (status == services::TransferStatus::kIncomplete)
+      return {http::errors::kInternalServerError, "text/plain", "transfer incomplete"};
+    if (status != services::TransferStatus::kOk)
+      return {http::errors::kInternalServerError, "text/plain", "internal error"};
     return http::Response::Ok("OK", "text/plain");
   }
 
@@ -123,16 +124,32 @@ http::Response FileTransferController::Handle(const http::Request& req) {
     if (status == services::NspInstallStatus::kOk)
       return http::Response::Ok("{\"success\":true}", "application/json");
 
-    const char* error = "unknown";
+    const char* error = nsp::errors::kUnknown;
     switch (status) {
-      case services::NspInstallStatus::kInvalidPfs0:        error = "invalid_pfs0"; break;
-      case services::NspInstallStatus::kTooManyFiles:       error = "too_many_files"; break;
-      case services::NspInstallStatus::kNcaInstallFailed:   error = "nca_install_failed"; break;
-      case services::NspInstallStatus::kCnmtMissing:        error = "cnmt_missing"; break;
-      case services::NspInstallStatus::kCnmtReadFailed:     error = "cnmt_read_failed"; break;
-      case services::NspInstallStatus::kCnmtRegisterFailed: error = "cnmt_register_failed"; break;
-      case services::NspInstallStatus::kRecordFailed:       error = "record_failed"; break;
-      case services::NspInstallStatus::kNetworkError:       error = "network_error"; break;
+      case services::NspInstallStatus::kInvalidPfs0:
+        error = nsp::errors::kInvalidPfs0;
+        break;
+      case services::NspInstallStatus::kTooManyFiles:
+        error = nsp::errors::kTooManyFiles;
+        break;
+      case services::NspInstallStatus::kNcaInstallFailed:
+        error = nsp::errors::kNcaInstallFailed;
+        break;
+      case services::NspInstallStatus::kCnmtMissing:
+        error = nsp::errors::kCnmtMissing;
+        break;
+      case services::NspInstallStatus::kCnmtReadFailed:
+        error = nsp::errors::kCnmtReadFailed;
+        break;
+      case services::NspInstallStatus::kCnmtRegisterFailed:
+        error = nsp::errors::kCnmtRegisterFailed;
+        break;
+      case services::NspInstallStatus::kRecordFailed:
+        error = nsp::errors::kRecordFailed;
+        break;
+      case services::NspInstallStatus::kNetworkError:
+        error = nsp::errors::kNetworkError;
+        break;
       default: break;
     }
     return http::Response::Ok(

@@ -1,4 +1,6 @@
 #include "mcp_controller.hpp"
+
+#include "error_codes.hpp"
 #include "mcp_versions.hpp"
 
 namespace controllers {
@@ -13,11 +15,14 @@ http::Response McpController::Handle(const http::Request& req) {
 http::Response McpController::HandlePost(const http::Request& req) {
   nlohmann::json rpc = nlohmann::json::parse(req.body, nullptr, false);
   if (rpc.is_discarded() || !rpc.is_object())
-    return http::Response::Ok(BuildError(nullptr, -32700, "Parse error").dump());
+    return http::Response::Ok(
+        BuildError(nullptr, mcp::errors::kParseError, "Parse error").dump());
 
   if (!rpc.contains("jsonrpc") || rpc["jsonrpc"] != "2.0" ||
       !rpc.contains("method") || !rpc["method"].is_string())
-    return http::Response::Ok(BuildError(nullptr, -32600, "Invalid Request").dump());
+    return http::Response::Ok(
+        BuildError(nullptr, mcp::errors::kInvalidRequest, "Invalid Request")
+            .dump());
 
   if (!rpc.contains("id"))
     return http::Response::NoContent();
@@ -32,30 +37,35 @@ http::Response McpController::HandlePost(const http::Request& req) {
 http::Response McpController::HandleModernRequest(const nlohmann::json& rpc) {
   const nlohmann::json id = rpc["id"];
   if (id.is_null() || (!id.is_string() && !id.is_number_integer()))
-    return http::Response::Ok(BuildError(nullptr, -32600, "Invalid Request").dump());
+    return http::Response::Ok(
+        BuildError(nullptr, mcp::errors::kInvalidRequest, "Invalid Request")
+            .dump());
 
   const nlohmann::json& params = rpc.value("params", nlohmann::json::object());
   if (!params.is_object())
-    return http::Response::Ok(BuildError(id, -32602,
+    return http::Response::Ok(BuildError(id, mcp::errors::kInvalidParams,
         "Invalid params: params must be an object").dump());
 
   const nlohmann::json& meta = params["_meta"];
 
   if (!meta.contains("io.modelcontextprotocol/protocolVersion") ||
       !meta["io.modelcontextprotocol/protocolVersion"].is_string())
-    return http::Response::Ok(BuildError(id, -32602,
+    return http::Response::Ok(BuildError(id, mcp::errors::kInvalidParams,
         "Invalid params: missing protocolVersion in _meta").dump());
 
   if (!meta.contains("io.modelcontextprotocol/clientCapabilities"))
-    return http::Response::Ok(BuildError(id, -32602,
+    return http::Response::Ok(BuildError(id, mcp::errors::kInvalidParams,
         "Invalid params: missing clientCapabilities in _meta").dump());
 
   const std::string requested =
       meta["io.modelcontextprotocol/protocolVersion"].get<std::string>();
   if (requested != mcp::kVersion)
-    return http::Response::Ok(BuildError(id, -32022, "Unsupported protocol version",
-        nlohmann::json{{"supported", mcp::kSupportedVersions},
-                       {"requested", requested}}).dump());
+    return http::Response::Ok(
+        BuildError(id, mcp::errors::kUnsupportedProtocolVersion,
+                   "Unsupported protocol version",
+                   nlohmann::json{{"supported", mcp::kSupportedVersions},
+                                  {"requested", requested}})
+            .dump());
 
   return http::Response::Ok(
       mcp_service_.Dispatch(rpc["method"].get<std::string>(), params, id).dump());
@@ -64,11 +74,13 @@ http::Response McpController::HandleModernRequest(const nlohmann::json& rpc) {
 http::Response McpController::HandleLegacyRequest(const nlohmann::json& rpc) {
   const nlohmann::json id = rpc["id"];
   if (id.is_null() || (!id.is_string() && !id.is_number_integer()))
-    return http::Response::Ok(BuildError(nullptr, -32600, "Invalid Request").dump());
+    return http::Response::Ok(
+        BuildError(nullptr, mcp::errors::kInvalidRequest, "Invalid Request")
+            .dump());
 
   const nlohmann::json params = rpc.value("params", nlohmann::json::object());
   if (!params.is_object())
-    return http::Response::Ok(BuildError(id, -32602,
+    return http::Response::Ok(BuildError(id, mcp::errors::kInvalidParams,
         "Invalid params: params must be an object").dump());
 
   return http::Response::Ok(
