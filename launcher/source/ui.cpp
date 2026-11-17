@@ -4,6 +4,7 @@
 #include "network.hpp"
 
 #include <cstdio>
+#include <cerrno>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -21,6 +22,7 @@ Arriba::Primitives::Text* boot2_text   = nullptr;
 Arriba::Primitives::Text* status_text  = nullptr;
 Arriba::Primitives::Text* version_text = nullptr;
 Arriba::Primitives::Text* ip_text      = nullptr;
+Arriba::Primitives::Text* upload_text  = nullptr;
 
 void NavigateButtons(Arriba::Elements::Button** btns, int count, int* sel) {
   using namespace Arriba::Input;
@@ -294,9 +296,8 @@ void InitUi(int upload_fd, const std::string& ip, bool module_running, const Ver
   mcp_text->setColour({0.45f, 0.45f, 0.45f, 1.0f});
 
   char upload_buf[32];
-  snprintf(upload_buf, sizeof(upload_buf), "Upload: %u%s",
-    kUploadPort, upload_fd >= 0 ? "" : " (unavailable)");
-  auto* upload_text = new Arriba::Primitives::Text(upload_buf, 26);
+  snprintf(upload_buf, sizeof(upload_buf), "Upload: %u%s", kUploadPort, upload_fd >= 0 ? "" : " (unavailable)");
+  upload_text = new Arriba::Primitives::Text(upload_buf, 26);
   upload_text->transform.position = {w / 2.0f, 158.0f, 0};
   upload_text->setColour({0.45f, 0.45f, 0.45f, 1.0f});
 
@@ -344,15 +345,31 @@ void UpdateIpText(const std::string& ip) {
   if (ip_text) ip_text->setText(ip.c_str());
 }
 
-bool HandleUiInput(int upload_fd) {
+void UpdateUploadText(int upload_fd) {
+  if (!upload_text) return;
+  char buf[32];
+  snprintf(buf, sizeof(buf), "Upload: %u%s", kUploadPort, upload_fd >= 0 ? "" : " (unavailable)");
+  upload_text->setText(buf);
+}
+
+bool HandleUiInput(int& upload_fd) {
   if (upload_fd >= 0) {
     struct timeval tv = {0, 0};
     fd_set fds;
     FD_ZERO(&fds);
     FD_SET(upload_fd, &fds);
-    if (select(upload_fd + 1, &fds, nullptr, nullptr, &tv) > 0) {
+    int ready = select(upload_fd + 1, &fds, nullptr, nullptr, &tv);
+    if (ready < 0 && errno != EINTR) {
+      close(upload_fd);
+      upload_fd = -1;
+      UpdateUploadText(upload_fd);
+    } else if (ready > 0) {
       int client = accept(upload_fd, nullptr, nullptr);
       if (client >= 0) {
+        constexpr int kClientTimeoutSec = 30;
+        struct timeval timeout = {kClientTimeoutSec, 0};
+        setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+        setsockopt(client, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
         SetStatus("Uploading...");
         Arriba::drawFrame();
         bool ok = HandleUpload(client);
@@ -361,6 +378,10 @@ bool HandleUiInput(int upload_fd) {
           ModuleRestart();
         else
           SetStatus("Upload: FAILED");
+      } else if (errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
+        close(upload_fd);
+        upload_fd = -1;
+        UpdateUploadText(upload_fd);
       }
     }
   }

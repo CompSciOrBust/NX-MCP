@@ -45,7 +45,7 @@ void SendResponse(int fd, int status) {
 
 std::string GetLocalIp() {
   int sock = socket(AF_INET, SOCK_DGRAM, 0);
-  if (sock < 0) return "?.?.?.?";
+  if (sock < 0) return kUnavailableIp;
 
   struct sockaddr_in addr{};
   addr.sin_family = AF_INET;
@@ -54,16 +54,19 @@ std::string GetLocalIp() {
 
   if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
     close(sock);
-    return "?.?.?.?";
+    return kUnavailableIp;
   }
 
   struct sockaddr_in local{};
   socklen_t len = sizeof(local);
-  getsockname(sock, (struct sockaddr*)&local, &len);
+  int result = getsockname(sock, (struct sockaddr*)&local, &len);
   close(sock);
 
   char buf[INET_ADDRSTRLEN];
-  inet_ntop(AF_INET, &local.sin_addr, buf, sizeof(buf));
+  if (result < 0 || local.sin_addr.s_addr == INADDR_ANY ||
+      !inet_ntop(AF_INET, &local.sin_addr, buf, sizeof(buf))) {
+    return kUnavailableIp;
+  }
   return buf;
 }
 

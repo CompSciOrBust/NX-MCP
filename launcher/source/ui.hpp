@@ -6,4 +6,5 @@ bool ShowInstallPrompt();
 bool ShowUpdatePrompt(const Version& current);
 void InitUi(int upload_fd, const std::string& ip, bool module_running, const Version& version);
 void UpdateIpText(const std::string& ip);
-bool HandleUiInput(int upload_fd);
+void UpdateUploadText(int upload_fd);
+bool HandleUiInput(int& upload_fd);
