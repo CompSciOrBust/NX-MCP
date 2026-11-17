@@ -78,17 +78,34 @@ TEST_CASE_METHOD(Fixture, "Dispatch: id is echoed back in response") {
 
 // ── HandleInitialize ──────────────────────────────────────────────────────────
 
-TEST_CASE_METHOD(Fixture, "Initialize: wrong protocol version returns -32022 with version data") {
-  auto j = svc_.Dispatch("initialize", {{"protocolVersion", "1999-01-01"}}, 1);
-  REQUIRE(j["error"]["code"] == -32022);
-  REQUIRE(j["error"]["data"]["requested"] == "1999-01-01");
-  REQUIRE(j["error"]["data"]["supported"][0] == mcp::kLegacyVersion);
+TEST_CASE_METHOD(Fixture,
+                 "Initialize: unsupported version uses the legacy fallback") {
+  const auto requested = GENERATE("1999-01-01", mcp::kVersion);
+  auto j = svc_.Dispatch("initialize", {{"protocolVersion", requested}}, 1);
+  REQUIRE(j["result"]["protocolVersion"] == mcp::kLegacyVersions.front());
+}
+
+TEST_CASE_METHOD(Fixture, "Initialize: older supported version is echoed") {
+  const auto version = mcp::kLegacyVersions.back();
+  auto j = svc_.Dispatch("initialize", {{"protocolVersion", version}}, 1);
+  REQUIRE(j["result"]["protocolVersion"] == version);
+  REQUIRE(j["result"]["capabilities"].contains("tools"));
+}
+
+TEST_CASE_METHOD(Fixture,
+                 "Initialize: missing or non-string version is invalid") {
+  const auto params =
+      GENERATE(nlohmann::json::object(),
+               nlohmann::json{{"protocolVersion", false}});
+  const auto response = svc_.Dispatch("initialize", params, 1);
+  REQUIRE(response["error"]["code"] == -32602);
 }
 
 TEST_CASE_METHOD(Fixture, "Initialize: correct version returns serverInfo and capabilities") {
-  auto j = svc_.Dispatch("initialize", {{"protocolVersion", mcp::kLegacyVersion}}, 1);
+  const auto version = mcp::kLegacyVersions.front();
+  auto j = svc_.Dispatch("initialize", {{"protocolVersion", version}}, 1);
   REQUIRE(j.contains("result"));
-  REQUIRE(j["result"]["protocolVersion"] == mcp::kLegacyVersion);
+  REQUIRE(j["result"]["protocolVersion"] == version);
   REQUIRE(j["result"]["serverInfo"]["name"] == mcp::kServerName);
   REQUIRE(j["result"]["capabilities"].contains("tools"));
   REQUIRE(j["result"].contains("instructions"));
@@ -96,10 +113,12 @@ TEST_CASE_METHOD(Fixture, "Initialize: correct version returns serverInfo and ca
 
 // ── HandleDiscover ────────────────────────────────────────────────────────────
 
-TEST_CASE_METHOD(Fixture, "Discover: returns complete result with supported version") {
+TEST_CASE_METHOD(Fixture, "Discover: returns all supported versions") {
   auto j = svc_.Dispatch("server/discover", {}, 1);
   REQUIRE(j["result"]["resultType"] == "complete");
-  REQUIRE(j["result"]["supportedVersions"][0] == mcp::kVersion);
+  const auto expected = nlohmann::json::array(
+      {mcp::kVersion, mcp::kLegacyVersions.front(), mcp::kLegacyVersions.back()});
+  REQUIRE(j["result"]["supportedVersions"] == expected);
   REQUIRE(j["result"]["capabilities"].contains("tools"));
   REQUIRE(j["result"]["_meta"]["io.modelcontextprotocol/serverInfo"]["name"] == mcp::kServerName);
 }

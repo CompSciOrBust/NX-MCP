@@ -132,7 +132,9 @@ TEST_CASE_METHOD(Fixture, "Modern: unsupported protocol version returns -32022 w
   auto j = Body(ctrl_.Handle(PostReq(rpc)));
   REQUIRE(j["error"]["code"] == -32022);
   REQUIRE(j["error"]["data"]["requested"] == "1999-01-01");
-  REQUIRE(j["error"]["data"]["supported"][0] == mcp::kVersion);
+  const auto expected = nlohmann::json::array(
+      {mcp::kVersion, mcp::kLegacyVersions.front(), mcp::kLegacyVersions.back()});
+  REQUIRE(j["error"]["data"]["supported"] == expected);
 }
 
 TEST_CASE_METHOD(Fixture, "Modern: valid request dispatches to service with correct method and id") {

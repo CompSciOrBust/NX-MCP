@@ -54,7 +54,7 @@ http::Response McpController::HandleModernRequest(const nlohmann::json& rpc) {
       meta["io.modelcontextprotocol/protocolVersion"].get<std::string>();
   if (requested != mcp::kVersion)
     return http::Response::Ok(BuildError(id, -32022, "Unsupported protocol version",
-        nlohmann::json{{"supported", nlohmann::json::array({mcp::kVersion})},
+        nlohmann::json{{"supported", mcp::kSupportedVersions},
                        {"requested", requested}}).dump());
 
   return http::Response::Ok(

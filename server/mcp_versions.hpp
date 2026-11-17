@@ -1,10 +1,21 @@
 #pragma once
+
+#include <array>
 #include <cstdint>
 
 namespace mcp {
 
 inline constexpr const char* kVersion = "2026-07-28";
-inline constexpr const char* kLegacyVersion = "2025-11-25";
+inline constexpr std::array kLegacyVersions{"2025-11-25", "2025-06-18"};
+inline constexpr auto kSupportedVersions = [] {
+  std::array<const char*, 1 + kLegacyVersions.size()> versions{};
+  auto entry = versions.begin();
+  *entry++ = kVersion;
+  for (const auto version : kLegacyVersions) {
+    *entry++ = version;
+  }
+  return versions;
+}();
 inline constexpr const char* kServerName = "NX-MCP";
 
 struct Version {

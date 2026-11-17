@@ -1,4 +1,8 @@
 #include "mcp_service.hpp"
+
+#include <algorithm>
+#include <string>
+
 #include "mcp_versions.hpp"
 #include "tool_registry.hpp"
 #include "resource_registry.hpp"
@@ -25,28 +29,27 @@ nlohmann::json McpService::Dispatch(const std::string& method,
 }
 
 nlohmann::json McpService::HandleInitialize(const nlohmann::json& params,
-                                             const nlohmann::json& id) {
-  const std::string requested =
-      params.value("protocolVersion", std::string(""));
-  if (requested != mcp::kLegacyVersion) {
+                                            const nlohmann::json& id) {
+  const auto version = params.find("protocolVersion");
+  if (version == params.end() || !version->is_string()) {
+    constexpr int kInvalidParams = -32602;
     return {
-      {"jsonrpc", "2.0"},
-      {"id", id},
-      {"error", {
-        {"code", -32022},
-        {"message", "Unsupported protocol version"},
-        {"data", {
-          {"supported", nlohmann::json::array({mcp::kLegacyVersion})},
-          {"requested", requested}
-        }}
-      }}
+        {"jsonrpc", "2.0"},
+        {"id", id},
+        {"error",
+         {{"code", kInvalidParams},
+           {"message", "Invalid protocol version"}}},
     };
   }
+  const auto& requested = version->get_ref<const std::string&>();
+  const auto& supported = mcp::kLegacyVersions;
+  const auto match = std::find(supported.begin(), supported.end(), requested);
+  const auto negotiated = match == supported.end() ? supported.front() : *match;
   return {
     {"jsonrpc", "2.0"},
     {"id", id},
     {"result", {
-      {"protocolVersion", mcp::kLegacyVersion},
+      {"protocolVersion", negotiated},
       {"capabilities", {{"tools", nlohmann::json::object()}, {"resources", nlohmann::json::object()}}},
       {"serverInfo", {{"name", mcp::kServerName}, {"version", mcp::kServerVersion}}},
       {"instructions", mcp::kInstructions}
@@ -60,7 +63,7 @@ nlohmann::json McpService::HandleDiscover(const nlohmann::json& id) {
     {"id", id},
     {"result", {
       {"resultType", "complete"},
-      {"supportedVersions", {mcp::kVersion}},
+      {"supportedVersions", mcp::kSupportedVersions},
       {"capabilities", {{"tools", nlohmann::json::object()}, {"resources", nlohmann::json::object()}}},
       {"_meta", {
         {"io.modelcontextprotocol/serverInfo", {
