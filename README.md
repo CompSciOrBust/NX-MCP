@@ -17,7 +17,7 @@ With the context NX-MCP provides, AI agents can autonomously pull crash reports,
 
 ## Connecting an MCP client
 
-The server listens on **port 57331** and supports both the modern (`2026-07-28`) and legacy (`2025-11-25`) protocol versions.
+The server listens on **port 57331**. It supports the modern `2026-07-28` protocol version as well as the `2025-11-25` and `2025-06-18` legacy versions.
 
 For Claude Code:
 ```
@@ -121,8 +121,8 @@ The `fs_read_file` and `fs_write_file` tools pass file contents through the MCP 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/fs/download?path=<sdmc_path>` | Stream a file from the SD card |
-| `PUT` | `/fs/upload?path=<sdmc_path>` | Stream a file to the SD card |
-| `POST` | `/fs/install/nsp?storage=<sd\|nand>` | Stream an NSP body directly into NCM content storage — no SD staging needed; `storage` defaults to `sd` |
+| `PUT` or `POST` | `/fs/upload?path=<sdmc_path>` | Stream a file to the SD card |
+| `PUT` or `POST` | `/fs/install/nsp?storage=<sd\|nand>` | Stream an NSP body directly into NCM content storage — no SD staging needed; `storage` defaults to `sd` |
 
 `/fs/install/nsp` requires a `Content-Length` header and returns JSON:
 
@@ -145,10 +145,11 @@ It also hosts an upload server on port **7332** for pushing sysmodule updates ov
 
 ## Building from Source
 
-Requires [devkitPro](https://devkitpro.org/) with devkitARM and libnx.
+Requires [devkitPro](https://devkitpro.org/) with devkitA64 and libnx.
 
 ```sh
 git clone --recurse-submodules https://github.com/CompSciOrBust/NX-MCP
+cd NX-MCP
 cd launcher && make
 ```
 
@@ -156,10 +157,11 @@ The output is `launcher/launcher.nro`. Building the launcher also builds `server
 
 ### Updating the sysmodule over the air
 
-After rebuilding (`cd server && make`), push the new NSP to a running Switch without re-running the launcher:
+With the launcher open on the Switch, rebuild the server and upload it from the repository root:
 
 ```sh
-curl -s -X POST http://<switch-ip>:7332 --data-binary @server/exefs.nsp && echo "upload OK"
+make -C server
+curl -fsS -X POST http://<switch-ip>:7332 --data-binary @server/exefs.nsp && echo "upload OK"
 ```
 
 The launcher's upload server receives the file and restarts the module automatically.
