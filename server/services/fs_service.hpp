@@ -26,7 +26,8 @@ class FsService {
 
   // Overwrites `path` with `len` bytes from `data`.
   // Returns false if the file cannot be opened or the write is incomplete.
-  bool WriteFile(const std::string& path, const void* data, size_t len);
+  bool WriteFile(const std::string& path, const void* data, size_t len,
+                 bool create_parents = false);
 
   // Streams `path` through on_chunk (called with each kChunkSize block).
   // on_chunk returns false to abort. Returns false if the file cannot be opened.
@@ -43,6 +44,8 @@ class FsService {
   bool ListDir(const std::string& path, std::vector<DirEntry>* out);
   bool Rename(const std::string& source, const std::string& dest,
               bool create_parents = false);
+  bool CreateDirectory(const std::string& path, bool create_parents = false);
+  bool EnsureParentDirectory(const std::string& path);
   void MkdirP(const std::string& path);
   bool IsDirectory(const std::string& path) const;
   int64_t FileSize(const std::string& path) const;  // -1 if not found or is a directory

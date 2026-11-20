@@ -175,6 +175,23 @@ TEST_CASE("FsService::WriteFile returns false for unwritable path") {
   REQUIRE_FALSE(fs().WriteFile(kDir + "/no_subdir/file.txt", "x", 1));
 }
 
+TEST_CASE("FsService creates missing parents only when requested") {
+  ResetDir();
+  const std::string file = kDir + "/a/b/file.txt";
+  REQUIRE_FALSE(fs().WriteFile(file, "data", 4));
+  REQUIRE_FALSE(fs().IsDirectory(kDir + "/a"));
+  REQUIRE(fs().WriteFile(file, "data", 4, true));
+  REQUIRE(ReadAll(file) == "data");
+
+  const std::string dir = kDir + "/c/d/leaf";
+  REQUIRE_FALSE(fs().CreateDirectory(dir));
+  REQUIRE_FALSE(fs().IsDirectory(kDir + "/c"));
+  REQUIRE(fs().CreateDirectory(dir, true));
+  REQUIRE(fs().IsDirectory(dir));
+  REQUIRE_FALSE(fs().CreateDirectory(dir, true));
+  REQUIRE_FALSE(fs().WriteFile(kDir + "/a/b/file.txt/child", "x", 1, true));
+}
+
 // ── StreamRead ────────────────────────────────────────────────────────────────
 
 TEST_CASE("FsService::StreamRead delivers all bytes via callback") {

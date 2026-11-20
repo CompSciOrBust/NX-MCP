@@ -159,7 +159,7 @@ ResourceRegistry::ResourceRegistry() {
     "\n"
     "To install a sysmodule from a zip file:\n"
     "  1. Inspect the zip to find the atmosphere/contents/<title_id>/ structure.\n"
-    "  2. Create directories with fs_mkdir (parent must exist first).\n"
+    "  2. Create directories with fs_mkdir (use create_parents for missing parents).\n"
     "  3. Upload each file with /fs/upload.\n"
     "  4. Launch immediately with pm_launch <program_id> — no reboot needed on CFW.\n"
     "\n"

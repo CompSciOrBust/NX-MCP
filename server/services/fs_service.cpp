@@ -16,13 +16,7 @@ bool FsService::Rename(const std::string& source, const std::string& dest,
   if (create_parents) {
     struct stat st{};
     if (stat(source.c_str(), &st) != 0) return false;
-    size_t end = dest.find_last_not_of('/');
-    size_t slash = end == std::string::npos ? std::string::npos : dest.rfind('/', end);
-    if (slash != std::string::npos && slash > 0) {
-      const std::string parent = dest.substr(0, slash);
-      MkdirP(parent);
-      if (!IsDirectory(parent)) return false;
-    }
+    if (!EnsureParentDirectory(dest)) return false;
   }
   return std::rename(source.c_str(), dest.c_str()) == 0;
 }
@@ -44,7 +38,9 @@ bool FsService::ReadFile(const std::string& path, int64_t offset, int64_t length
   return true;
 }
 
-bool FsService::WriteFile(const std::string& path, const void* data, size_t len) {
+bool FsService::WriteFile(const std::string& path, const void* data, size_t len,
+                          bool create_parents) {
+  if (create_parents && !EnsureParentDirectory(path)) return false;
   FILE* fp = fopen(path.c_str(), "wb");
   if (!fp) return false;
   size_t written = fwrite(data, 1, len, fp);
@@ -123,6 +119,20 @@ void FsService::MkdirP(const std::string& path) {
     }
   }
   mkdir(p.c_str(), 0777);
+}
+
+bool FsService::EnsureParentDirectory(const std::string& path) {
+  size_t end = path.find_last_not_of('/');
+  size_t slash = end == std::string::npos ? std::string::npos : path.rfind('/', end);
+  if (slash == std::string::npos || slash == 0) return true;
+  const std::string parent = path.substr(0, slash);
+  MkdirP(parent);
+  return IsDirectory(parent);
+}
+
+bool FsService::CreateDirectory(const std::string& path, bool create_parents) {
+  if (create_parents && !EnsureParentDirectory(path)) return false;
+  return mkdir(path.c_str(), 0777) == 0;
 }
 
 bool FsService::IsDirectory(const std::string& path) const {

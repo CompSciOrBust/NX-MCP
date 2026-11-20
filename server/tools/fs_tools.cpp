@@ -132,7 +132,8 @@ nlohmann::json FsWriteFileTool::InputSchema() const {
     {"type", "object"},
     {"properties", {
       {"path", {{"type","string"},{"description","File path to write, e.g. \"sdmc:/test.txt\""}}},
-      {"data", {{"type","string"},{"description","UTF-8 text content to write"}}}
+      {"data", {{"type","string"},{"description","UTF-8 text content to write"}}},
+      {"create_parents", {{"type","boolean"},{"description","Create missing parent directories (default: false)"}}}
     }},
     {"required", {"path", "data"}}
   };
@@ -143,11 +144,14 @@ ToolResult FsWriteFileTool::Execute(const nlohmann::json& arguments) {
     return {"path required (string)", true};
   if (!arguments.contains("data") || !arguments["data"].is_string())
     return {"data required (string)", true};
+  if (arguments.contains("create_parents") && !arguments["create_parents"].is_boolean())
+    return {"create_parents must be a boolean", true};
 
   const std::string path = arguments["path"].get<std::string>();
   const std::string data = arguments["data"].get<std::string>();
 
-  if (!services::FsService::Instance().WriteFile(path, data.data(), data.size()))
+  if (!services::FsService::Instance().WriteFile(
+          path, data.data(), data.size(), arguments.value("create_parents", false)))
     return {"cannot open file for writing: " + path, true};
 
   char buf[128];
@@ -216,14 +220,15 @@ ToolResult FsDeleteTool::Execute(const nlohmann::json& arguments) {
 std::string FsMkdirTool::Name() const { return "fs_mkdir"; }
 
 std::string FsMkdirTool::Description() const {
-  return "Creates a directory on the SD card. Parent directories must already exist.";
+  return "Creates a directory on the SD card, optionally creating missing parent directories.";
 }
 
 nlohmann::json FsMkdirTool::InputSchema() const {
   return {
     {"type", "object"},
     {"properties", {
-      {"path", {{"type","string"},{"description","Directory path to create, e.g. \"sdmc:/my_folder\""}}}
+      {"path", {{"type","string"},{"description","Directory path to create, e.g. \"sdmc:/my_folder\""}}},
+      {"create_parents", {{"type","boolean"},{"description","Create missing parent directories (default: false)"}}}
     }},
     {"required", {"path"}}
   };
@@ -233,9 +238,13 @@ ToolResult FsMkdirTool::Execute(const nlohmann::json& arguments) {
   if (!arguments.contains("path") || !arguments["path"].is_string())
     return {"path required (string)", true};
 
+  if (arguments.contains("create_parents") && !arguments["create_parents"].is_boolean())
+    return {"create_parents must be a boolean", true};
+
   const std::string path = arguments["path"].get<std::string>();
 
-  if (mkdir(path.c_str(), 0777) == 0)
+  if (services::FsService::Instance().CreateDirectory(
+          path, arguments.value("create_parents", false)))
     return {"Created directory: " + path, false};
 
   return {"failed to create directory: " + path, true};
@@ -374,7 +383,8 @@ nlohmann::json FsZipTool::InputSchema() const {
     {"type", "object"},
     {"properties", {
       {"source", {{"type","string"},{"description","File or directory to zip, e.g. \"sdmc:/atmosphere\""}}},
-      {"dest",   {{"type","string"},{"description","Output zip file path, e.g. \"sdmc:/atmosphere_backup.zip\""}}}
+      {"dest",   {{"type","string"},{"description","Output zip file path, e.g. \"sdmc:/atmosphere_backup.zip\""}}},
+      {"create_parents", {{"type","boolean"},{"description","Create missing destination parent directories (default: false)"}}}
     }},
     {"required", {"source", "dest"}}
   };
@@ -385,6 +395,8 @@ ToolResult FsZipTool::Execute(const nlohmann::json& arguments) {
     return {"source required (string)", true};
   if (!arguments.contains("dest") || !arguments["dest"].is_string())
     return {"dest required (string)", true};
+  if (arguments.contains("create_parents") && !arguments["create_parents"].is_boolean())
+    return {"create_parents must be a boolean", true};
 
   const std::string src  = arguments["source"].get<std::string>();
   const std::string dest = arguments["dest"].get<std::string>();
@@ -393,6 +405,9 @@ ToolResult FsZipTool::Execute(const nlohmann::json& arguments) {
   bool is_dir = fs.IsDirectory(src);
   if (!is_dir && fs.FileSize(src) < 0)
     return {"source not found: " + src, true};
+
+  if (arguments.value("create_parents", false) && !fs.EnsureParentDirectory(dest))
+    return {"cannot create parent directories: " + dest, true};
 
   zipFile zf = zipOpen(dest.c_str(), APPEND_STATUS_CREATE);
   if (!zf)

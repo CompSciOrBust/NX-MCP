@@ -51,13 +51,15 @@ For other tools, ask the AI how to adapt the above for itself.
 |------|-------------|
 | `fs_list_dir` | List directory contents on the SD card |
 | `fs_read_file` | Read text file content (up to 64 KB per call) |
-| `fs_write_file` | Write UTF-8 text to a file, overwriting existing content |
+| `fs_write_file` | Write UTF-8 text to a file, overwriting existing content; optionally create missing parent directories |
 | `fs_delete` | Delete a file or empty directory |
-| `fs_mkdir` | Create a directory |
+| `fs_mkdir` | Create a directory, optionally creating missing parent directories |
 | `fs_rename` | Rename or move a file or directory using `source` and `dest` paths; set `create_parents` to `true` to create missing destination parent directories. An existing destination may be replaced |
 | `fs_crc32` | Compute the CRC32 checksum of a file using hardware acceleration |
-| `fs_zip` | Create a zip archive from a file or directory (recursive) |
+| `fs_zip` | Create a zip archive from a file or directory (recursive), optionally creating missing destination parent directories |
 | `fs_unzip` | Extract a zip archive to a directory, preserving structure |
+
+For `fs_write_file`, `fs_mkdir`, `fs_rename`, and `fs_zip`, set the optional boolean `create_parents` to `true` to create missing parent directories. It defaults to `false`.
 
 ### Processes
 | Tool | Description |
