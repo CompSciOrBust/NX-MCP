@@ -41,6 +41,8 @@ class FsService {
                    std::function<ssize_t(char*, size_t)> on_recv);
 
   bool ListDir(const std::string& path, std::vector<DirEntry>* out);
+  bool Rename(const std::string& source, const std::string& dest,
+              bool create_parents = false);
   void MkdirP(const std::string& path);
   bool IsDirectory(const std::string& path) const;
   int64_t FileSize(const std::string& path) const;  // -1 if not found or is a directory

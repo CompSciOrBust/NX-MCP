@@ -22,6 +22,8 @@ static bool kDeleteRegistered =
     ToolRegistry::Instance().Register(std::make_unique<FsDeleteTool>());
 static bool kMkdirRegistered =
     ToolRegistry::Instance().Register(std::make_unique<FsMkdirTool>());
+static bool kRenameRegistered =
+    ToolRegistry::Instance().Register(std::make_unique<FsRenameTool>());
 static bool kCrc32Registered =
     ToolRegistry::Instance().Register(std::make_unique<FsCrc32Tool>());
 static bool kZipRegistered =
@@ -237,6 +239,42 @@ ToolResult FsMkdirTool::Execute(const nlohmann::json& arguments) {
     return {"Created directory: " + path, false};
 
   return {"failed to create directory: " + path, true};
+}
+
+// ---- FsRenameTool ----------------------------------------------------------
+
+std::string FsRenameTool::Name() const { return "fs_rename"; }
+
+std::string FsRenameTool::Description() const {
+  return "Renames or moves a file or directory on the SD card. An existing destination may be replaced.";
+}
+
+nlohmann::json FsRenameTool::InputSchema() const {
+  return {
+    {"type", "object"},
+    {"properties", {
+      {"source", {{"type", "string"}, {"description", "Current file or directory path"}}},
+      {"dest", {{"type", "string"}, {"description", "New file or directory path"}}},
+      {"create_parents", {{"type", "boolean"}, {"description", "Create missing destination parent directories (default: false)"}}}
+    }},
+    {"required", {"source", "dest"}}
+  };
+}
+
+ToolResult FsRenameTool::Execute(const nlohmann::json& arguments) {
+  if (!arguments.contains("source") || !arguments["source"].is_string())
+    return {"source required (string)", true};
+  if (!arguments.contains("dest") || !arguments["dest"].is_string())
+    return {"dest required (string)", true};
+  if (arguments.contains("create_parents") && !arguments["create_parents"].is_boolean())
+    return {"create_parents must be a boolean", true};
+
+  const std::string source = arguments["source"].get<std::string>();
+  const std::string dest = arguments["dest"].get<std::string>();
+  const bool create_parents = arguments.value("create_parents", false);
+  if (!services::FsService::Instance().Rename(source, dest, create_parents))
+    return {"failed to rename: " + source + " to " + dest, true};
+  return {"Renamed: " + source + " to " + dest, false};
 }
 
 // ---- FsCrc32Tool -----------------------------------------------------------

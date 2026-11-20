@@ -11,6 +11,22 @@ FsService& FsService::Instance() {
   return instance;
 }
 
+bool FsService::Rename(const std::string& source, const std::string& dest,
+                       bool create_parents) {
+  if (create_parents) {
+    struct stat st{};
+    if (stat(source.c_str(), &st) != 0) return false;
+    size_t end = dest.find_last_not_of('/');
+    size_t slash = end == std::string::npos ? std::string::npos : dest.rfind('/', end);
+    if (slash != std::string::npos && slash > 0) {
+      const std::string parent = dest.substr(0, slash);
+      MkdirP(parent);
+      if (!IsDirectory(parent)) return false;
+    }
+  }
+  return std::rename(source.c_str(), dest.c_str()) == 0;
+}
+
 bool FsService::ReadFile(const std::string& path, int64_t offset, int64_t length,
                          std::string* out) {
   if (length > static_cast<int64_t>(kChunkSize)) length = static_cast<int64_t>(kChunkSize);

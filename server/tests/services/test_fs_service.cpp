@@ -33,6 +33,49 @@ static std::string ReadAll(const std::string& path) {
   return out;
 }
 
+TEST_CASE("FsService::Rename moves files and populated directories") {
+  ResetDir();
+  PutFile(kFile, "content");
+  const std::string renamed_file = kDir + "/renamed.txt";
+  REQUIRE(fs().Rename(kFile, renamed_file));
+  REQUIRE(fs().FileSize(kFile) == -1);
+  REQUIRE(ReadAll(renamed_file) == "content");
+
+  const std::string source = kDir + "/source";
+  const std::string dest = kDir + "/dest";
+  REQUIRE(mkdir(source.c_str(), 0755) == 0);
+  PutFile(source + "/child.txt", "child");
+  REQUIRE(fs().Rename(source, dest));
+  REQUIRE_FALSE(fs().IsDirectory(source));
+  REQUIRE(ReadAll(dest + "/child.txt") == "child");
+}
+
+TEST_CASE("FsService::Rename fails for missing source or destination parent") {
+  ResetDir();
+  REQUIRE_FALSE(fs().Rename(kFile, kDir + "/dest"));
+  PutFile(kFile, "content");
+  REQUIRE_FALSE(fs().Rename(kFile, kDir + "/missing/dest"));
+  REQUIRE(ReadAll(kFile) == "content");
+}
+
+TEST_CASE("FsService::Rename optionally creates destination parents") {
+  ResetDir();
+  PutFile(kFile, "content");
+  const std::string dest = kDir + "/new/nested/file.txt";
+  REQUIRE_FALSE(fs().Rename(kFile, dest));
+  REQUIRE_FALSE(fs().IsDirectory(kDir + "/new"));
+  REQUIRE(fs().Rename(kFile, dest, true));
+  REQUIRE(ReadAll(dest) == "content");
+
+  const std::string source_dir = kDir + "/source";
+  REQUIRE(mkdir(source_dir.c_str(), 0755) == 0);
+  PutFile(source_dir + "/child.txt", "child");
+  REQUIRE(fs().Rename(source_dir, kDir + "/other/nested/folder", true));
+  REQUIRE(ReadAll(kDir + "/other/nested/folder/child.txt") == "child");
+  REQUIRE_FALSE(fs().Rename(kFile, kDir + "/unused/file.txt", true));
+  REQUIRE_FALSE(fs().IsDirectory(kDir + "/unused"));
+}
+
 // ── FileSize ──────────────────────────────────────────────────────────────────
 
 TEST_CASE("FsService::FileSize returns correct byte count") {

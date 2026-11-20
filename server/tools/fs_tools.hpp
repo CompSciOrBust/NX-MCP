@@ -43,6 +43,14 @@ class FsMkdirTool : public Tool {
   ToolResult Execute(const nlohmann::json& arguments) override;
 };
 
+class FsRenameTool : public Tool {
+ public:
+  std::string Name() const override;
+  std::string Description() const override;
+  nlohmann::json InputSchema() const override;
+  ToolResult Execute(const nlohmann::json& arguments) override;
+};
+
 class FsCrc32Tool : public Tool {
  public:
   std::string Name() const override;

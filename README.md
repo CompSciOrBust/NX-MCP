@@ -54,6 +54,7 @@ For other tools, ask the AI how to adapt the above for itself.
 | `fs_write_file` | Write UTF-8 text to a file, overwriting existing content |
 | `fs_delete` | Delete a file or empty directory |
 | `fs_mkdir` | Create a directory |
+| `fs_rename` | Rename or move a file or directory using `source` and `dest` paths; set `create_parents` to `true` to create missing destination parent directories. An existing destination may be replaced |
 | `fs_crc32` | Compute the CRC32 checksum of a file using hardware acceleration |
 | `fs_zip` | Create a zip archive from a file or directory (recursive) |
 | `fs_unzip` | Extract a zip archive to a directory, preserving structure |
